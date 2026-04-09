@@ -68,6 +68,9 @@ app.post('/api/submit', rateLimit, async (req, res) => {
   if (!submitted_by || typeof submitted_by !== 'string' || submitted_by.trim().length === 0) {
     return res.status(400).json({ error: 'submitted_by is required' });
   }
+  if (submitted_by.length > 100) return res.status(400).json({ error: 'Name too long' });
+  if (notes && notes.length > 1000) return res.status(400).json({ error: 'Notes too long' });
+  if (windscreen_courts && windscreen_courts.length > 500) return res.status(400).json({ error: 'Courts field too long' });
   // Sanitize inventory: values must be non-negative integers
   const cleanInventory = {};
   for (const [k, v] of Object.entries(inventory || {})) {

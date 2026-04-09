@@ -142,6 +142,15 @@
 <script>
   const ADMIN_KEY = new URLSearchParams(location.search).get('key') || '';
 
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   async function apiFetch(url) {
     const sep = url.includes('?') ? '&' : '?';
     return fetch(url + sep + 'key=' + encodeURIComponent(ADMIN_KEY));
@@ -198,15 +207,15 @@
 
       const invRows = Object.entries(s.inventory)
         .filter(([,v]) => v > 0)
-        .map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+        .map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
         .join('');
 
       return `
         <div class="submission-card">
           <div class="submission-header">
             <div>
-              <div class="facility">${s.facility}</div>
-              <div class="meta">Submitted by ${s.submitted_by} · ${date}</div>
+              <div class="facility">${esc(s.facility)}</div>
+              <div class="meta">Submitted by ${esc(s.submitted_by)} · ${date}</div>
             </div>
           </div>
           <div class="submission-body">
@@ -220,7 +229,7 @@
                 <span class="icon">${s.windscreens_up ? '✅' : '❌'}</span>
                 <div>
                   Windscreens up
-                  ${!s.windscreens_up && s.windscreen_courts ? `<div class="note">Courts: ${s.windscreen_courts}</div>` : ''}
+                  ${!s.windscreens_up && s.windscreen_courts ? `<div class="note">Courts: ${esc(s.windscreen_courts)}</div>` : ''}
                 </div>
               </div>
             </div>
@@ -230,7 +239,7 @@
                 ? `<table class="inv">${invRows}</table>`
                 : '<span style="color:#aaa;font-size:13px">No counts entered</span>'}
             </div>
-            ${s.notes ? `<div class="notes-box"><strong>Notes:</strong> ${s.notes}</div>` : ''}
+            ${s.notes ? `<div class="notes-box"><strong>Notes:</strong> ${esc(s.notes)}</div>` : ''}
           </div>
         </div>`;
     }).join('');
