@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: weekly-checklist
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: DB_PATH
+        value: /data/checklist.db
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Weekly Checklist</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f1; color: #1a1a1a; }
+
+    header {
+      background: #2c7a3e;
+      color: #fff;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 { font-size: 20px; font-weight: 700; }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filters select {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      background: rgba(255,255,255,.2);
+      color: #fff;
+      cursor: pointer;
+      outline: none;
+    }
+    .filters select option { background: #2c7a3e; color: #fff; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    }
+    .stat-card .num { font-size: 28px; font-weight: 800; color: #2c7a3e; }
+    .stat-card .lbl { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+
+    .submissions { display: flex; flex-direction: column; gap: 16px; }
+
+    .submission-card {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .submission-header {
+      background: #2c7a3e;
+      color: #fff;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .submission-header .facility { font-size: 18px; font-weight: 700; }
+    .submission-header .meta { font-size: 13px; opacity: .85; }
+
+    .submission-body { padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 600px) { .submission-body { grid-template-columns: 1fr; } }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #2c7a3e;
+      margin-bottom: 10px;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .check-row .icon { flex-shrink: 0; }
+    .check-row .note { color: #888; font-size: 12px; margin-top: 2px; }
+
+    table.inv { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table.inv td { padding: 5px 0; border-bottom: 1px solid #f0f0f0; }
+    table.inv td:last-child { text-align: right; font-weight: 700; }
+    table.inv tr:last-child td { border-bottom: none; }
+
+    .notes-box {
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      color: #444;
+      grid-column: 1 / -1;
+    }
+
+    .empty { text-align: center; padding: 60px 20px; color: #888; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Admin Dashboard</h1>
+  <div class="filters">
+    <select id="filter-week" onchange="load()">
+      <option value="">All weeks</option>
+    </select>
+    <select id="filter-facility" onchange="load()">
+      <option value="">All facilities</option>
+      <option value="SATC">SATC</option>
+      <option value="Pharr">Pharr</option>
+      <option value="Wilco">Wilco</option>
+    </select>
+  </div>
+</header>
+
+<main>
+  <div class="stats" id="stats"></div>
+  <div class="submissions" id="submissions"><div class="empty">Loading...</div></div>
+</main>
+
+<script>
+  async function loadWeeks() {
+    const res = await fetch('/api/weeks');
+    const weeks = await res.json();
+    const sel = document.getElementById('filter-week');
+    weeks.forEach(w => {
+      const opt = document.createElement('option');
+      opt.value = w;
+      opt.textContent = 'Week of ' + new Date(w + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      sel.appendChild(opt);
+    });
+    // Default to current week
+    if (weeks.length) sel.value = weeks[0];
+  }
+
+  async function load() {
+    const week     = document.getElementById('filter-week').value;
+    const facility = document.getElementById('filter-facility').value;
+    const params   = new URLSearchParams();
+    if (week)     params.set('week', week);
+    if (facility) params.set('facility', facility);
+
+    const res  = await fetch('/api/submissions?' + params);
+    const data = await res.json();
+
+    renderStats(data);
+    renderSubmissions(data);
+  }
+
+  function renderStats(data) {
+    const total = data.length;
+    const bathOk = data.filter(d => d.bathrooms_clean).length;
+    const windOk = data.filter(d => d.windscreens_up).length;
+    document.getElementById('stats').innerHTML = `
+      <div class="stat-card"><div class="num">${total}</div><div class="lbl">Submissions</div></div>
+      <div class="stat-card"><div class="num">${bathOk}/${total}</div><div class="lbl">Bathrooms ✅</div></div>
+      <div class="stat-card"><div class="num">${windOk}/${total}</div><div class="lbl">Windscreens ✅</div></div>
+    `;
+  }
+
+  function renderSubmissions(data) {
+    const el = document.getElementById('submissions');
+    if (!data.length) { el.innerHTML = '<div class="empty">No submissions found.</div>'; return; }
+
+    el.innerHTML = data.map(s => {
+      const date = new Date(s.submitted_at).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+
+      const invRows = Object.entries(s.inventory)
+        .filter(([,v]) => v > 0)
+        .map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+        .join('');
+
+      return `
+        <div class="submission-card">
+          <div class="submission-header">
+            <div>
+              <div class="facility">${s.facility}</div>
+              <div class="meta">Submitted by ${s.submitted_by} · ${date}</div>
+            </div>
+          </div>
+          <div class="submission-body">
+            <div>
+              <div class="section-title">Maintenance</div>
+              <div class="check-row">
+                <span class="icon">${s.bathrooms_clean ? '✅' : '❌'}</span>
+                <div>Bathrooms clean</div>
+              </div>
+              <div class="check-row">
+                <span class="icon">${s.windscreens_up ? '✅' : '❌'}</span>
+                <div>
+                  Windscreens up
+                  ${!s.windscreens_up && s.windscreen_courts ? `<div class="note">Courts: ${s.windscreen_courts}</div>` : ''}
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="section-title">Inventory</div>
+              ${invRows
+                ? `<table class="inv">${invRows}</table>`
+                : '<span style="color:#aaa;font-size:13px">No counts entered</span>'}
+            </div>
+            ${s.notes ? `<div class="notes-box"><strong>Notes:</strong> ${s.notes}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  loadWeeks().then(load);
+</script>
+</body>
+</html>
