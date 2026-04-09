@@ -31,16 +31,48 @@ async function initDB() {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ── Rate limiting (max 10 submits per IP per hour) ────────────────────────────
+const submitCounts = new Map();
+function rateLimit(req, res, next) {
+  const ip = req.ip;
+  const now = Date.now();
+  const entry = submitCounts.get(ip) || { count: 0, reset: now + 3600000 };
+  if (now > entry.reset) { entry.count = 0; entry.reset = now + 3600000; }
+  if (entry.count >= 10) return res.status(429).json({ error: 'Too many submissions. Try again later.' });
+  entry.count++;
+  submitCounts.set(ip, entry);
+  next();
+}
+
+// ── Admin key middleware ───────────────────────────────────────────────────────
+function requireAdmin(req, res, next) {
+  const key = req.query.key || req.headers['x-admin-key'];
+  if (!process.env.ADMIN_KEY || key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
 // ── POST /api/submit ──────────────────────────────────────────────────────────
-app.post('/api/submit', async (req, res) => {
+app.post('/api/submit', rateLimit, async (req, res) => {
   const {
     facility, submitted_by,
     bathrooms_clean, windscreens_up, windscreen_courts,
     inventory, notes
   } = req.body;
 
-  if (!facility || !submitted_by) {
-    return res.status(400).json({ error: 'facility and submitted_by are required' });
+  const validFacilities = ['SATC', 'Pharr', 'Wilco'];
+  if (!facility || !validFacilities.includes(facility)) {
+    return res.status(400).json({ error: 'Invalid facility' });
+  }
+  if (!submitted_by || typeof submitted_by !== 'string' || submitted_by.trim().length === 0) {
+    return res.status(400).json({ error: 'submitted_by is required' });
+  }
+  // Sanitize inventory: values must be non-negative integers
+  const cleanInventory = {};
+  for (const [k, v] of Object.entries(inventory || {})) {
+    const n = parseInt(v);
+    cleanInventory[String(k).slice(0, 100)] = isNaN(n) || n < 0 ? 0 : n;
   }
 
   const week_of = getWeekOf();
@@ -56,19 +88,19 @@ app.post('/api/submit', async (req, res) => {
       bathrooms_clean ? 1 : 0,
       windscreens_up  ? 1 : 0,
       windscreen_courts || null,
-      JSON.stringify(inventory || {}),
+      JSON.stringify(cleanInventory),
       notes || null
     ]
   });
 
   res.json({ success: true, id: Number(result.lastInsertRowid) });
 
-  sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes })
+  sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory: cleanInventory, notes })
     .catch(e => console.error('Email failed:', e.message));
 });
 
 // ── GET /api/submissions ──────────────────────────────────────────────────────
-app.get('/api/submissions', async (req, res) => {
+app.get('/api/submissions', requireAdmin, async (req, res) => {
   const { week, facility } = req.query;
   let sql = 'SELECT * FROM submissions WHERE 1=1';
   const args = [];
@@ -82,22 +114,8 @@ app.get('/api/submissions', async (req, res) => {
   res.json(result.rows.map(r => ({ ...r, inventory: JSON.parse(r.inventory) })));
 });
 
-// ── GET /api/test-email ───────────────────────────────────────────────────────
-app.get('/api/test-email', async (req, res) => {
-  try {
-    await sendEmail({
-      facility: 'TEST', submitted_by: 'System', week_of: getWeekOf(),
-      bathrooms_clean: 1, windscreens_up: 1, windscreen_courts: null,
-      inventory: { 'Ball Cases': 0 }, notes: 'This is a test email.'
-    });
-    res.json({ success: true, message: 'Email sent to ' + process.env.ADMIN_EMAIL });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
 // ── GET /api/weeks ────────────────────────────────────────────────────────────
-app.get('/api/weeks', async (req, res) => {
+app.get('/api/weeks', requireAdmin, async (req, res) => {
   const result = await db.execute('SELECT DISTINCT week_of FROM submissions ORDER BY week_of DESC');
   res.json(result.rows.map(r => r.week_of));
 });

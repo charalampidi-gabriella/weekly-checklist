@@ -140,8 +140,16 @@
 </main>
 
 <script>
+  const ADMIN_KEY = new URLSearchParams(location.search).get('key') || '';
+
+  async function apiFetch(url) {
+    const sep = url.includes('?') ? '&' : '?';
+    return fetch(url + sep + 'key=' + encodeURIComponent(ADMIN_KEY));
+  }
+
   async function loadWeeks() {
-    const res = await fetch('/api/weeks');
+    const res = await apiFetch('/api/weeks');
+    if (res.status === 401) { document.body.innerHTML = '<p style="padding:40px;color:red">Unauthorized. Add ?key=YOUR_KEY to the URL.</p>'; return; }
     const weeks = await res.json();
     const sel = document.getElementById('filter-week');
     weeks.forEach(w => {
@@ -161,7 +169,7 @@
     if (week)     params.set('week', week);
     if (facility) params.set('facility', facility);
 
-    const res  = await fetch('/api/submissions?' + params);
+    const res  = await apiFetch('/api/submissions?' + params);
     const data = await res.json();
 
     renderStats(data);
