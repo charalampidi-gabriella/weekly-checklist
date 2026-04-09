@@ -1,38 +1,32 @@
 require('dotenv').config();
 const express = require('express');
-const Database = require('better-sqlite3');
+const { createClient } = require('@libsql/client');
 const nodemailer = require('nodemailer');
 const path = require('path');
 
-const fs = require('fs');
-
 const app = express();
-const DB_PATH = process.env.DB_PATH || 'checklist.db';
-const DB_DIR = path.dirname(DB_PATH);
-if (DB_DIR !== '.' && !fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-const db = new Database(DB_PATH);
+const db = createClient({
+  url: process.env.TURSO_URL,
+  authToken: process.env.TURSO_TOKEN
+});
 
 // ── Schema ────────────────────────────────────────────────────────────────────
-db.exec(`
-  CREATE TABLE IF NOT EXISTS submissions (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    facility      TEXT    NOT NULL,
-    submitted_by  TEXT    NOT NULL,
-    submitted_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    week_of       TEXT    NOT NULL,
-
-    -- Maintenance (1 = yes, 0 = no)
-    bathrooms_clean   INTEGER NOT NULL,
-    windscreens_up    INTEGER NOT NULL,
-    windscreen_courts TEXT,
-
-    -- Inventory stored as JSON so new items need no schema change
-    inventory     TEXT NOT NULL,
-
-    -- Free-form notes
-    notes         TEXT
-  )
-`);
+async function initDB() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS submissions (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      facility          TEXT    NOT NULL,
+      submitted_by      TEXT    NOT NULL,
+      submitted_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+      week_of           TEXT    NOT NULL,
+      bathrooms_clean   INTEGER NOT NULL,
+      windscreens_up    INTEGER NOT NULL,
+      windscreen_courts TEXT,
+      inventory         TEXT NOT NULL,
+      notes             TEXT
+    )
+  `);
+}
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -51,22 +45,21 @@ app.post('/api/submit', async (req, res) => {
 
   const week_of = getWeekOf();
 
-  const stmt = db.prepare(`
-    INSERT INTO submissions
-      (facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const result = stmt.run(
-    facility,
-    submitted_by,
-    week_of,
-    bathrooms_clean ? 1 : 0,
-    windscreens_up  ? 1 : 0,
-    windscreen_courts || null,
-    JSON.stringify(inventory || {}),
-    notes || null
-  );
+  const result = await db.execute({
+    sql: `INSERT INTO submissions
+            (facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      facility,
+      submitted_by,
+      week_of,
+      bathrooms_clean ? 1 : 0,
+      windscreens_up  ? 1 : 0,
+      windscreen_courts || null,
+      JSON.stringify(inventory || {}),
+      notes || null
+    ]
+  });
 
   try {
     await sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes });
@@ -74,35 +67,35 @@ app.post('/api/submit', async (req, res) => {
     console.error('Email failed:', e.message);
   }
 
-  res.json({ success: true, id: result.lastInsertRowid });
+  res.json({ success: true, id: Number(result.lastInsertRowid) });
 });
 
 // ── GET /api/submissions ──────────────────────────────────────────────────────
-app.get('/api/submissions', (req, res) => {
+app.get('/api/submissions', async (req, res) => {
   const { week, facility } = req.query;
-  let query = 'SELECT * FROM submissions WHERE 1=1';
-  const params = [];
+  let sql = 'SELECT * FROM submissions WHERE 1=1';
+  const args = [];
 
-  if (week)     { query += ' AND week_of = ?';   params.push(week); }
-  if (facility) { query += ' AND facility = ?';  params.push(facility); }
+  if (week)     { sql += ' AND week_of = ?';  args.push(week); }
+  if (facility) { sql += ' AND facility = ?'; args.push(facility); }
 
-  query += ' ORDER BY submitted_at DESC';
+  sql += ' ORDER BY submitted_at DESC';
 
-  const rows = db.prepare(query).all(...params);
-  res.json(rows.map(r => ({ ...r, inventory: JSON.parse(r.inventory) })));
+  const result = await db.execute({ sql, args });
+  res.json(result.rows.map(r => ({ ...r, inventory: JSON.parse(r.inventory) })));
 });
 
 // ── GET /api/weeks ────────────────────────────────────────────────────────────
-app.get('/api/weeks', (req, res) => {
-  const rows = db.prepare('SELECT DISTINCT week_of FROM submissions ORDER BY week_of DESC').all();
-  res.json(rows.map(r => r.week_of));
+app.get('/api/weeks', async (req, res) => {
+  const result = await db.execute('SELECT DISTINCT week_of FROM submissions ORDER BY week_of DESC');
+  res.json(result.rows.map(r => r.week_of));
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getWeekOf() {
   const d = new Date();
-  const day = d.getDay(); // 0 = Sunday
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(d);
   monday.setDate(diff);
   return monday.toISOString().split('T')[0];
@@ -143,15 +136,12 @@ async function sendEmail({ facility, submitted_by, week_of, bathrooms_clean, win
         <p style="margin:4px 0 0;opacity:.85">Week of ${week_of} &nbsp;·&nbsp; Submitted by ${submitted_by}</p>
       </div>
       <div style="background:#fff;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px;padding:24px">
-
         <h3 style="color:#2c7a3e;margin-top:0">Maintenance</h3>
         <table style="width:100%;border-collapse:collapse">${maintenanceRows}</table>
-
         <h3 style="color:#2c7a3e;margin-top:24px">Inventory</h3>
         ${inventoryRows
           ? `<table style="width:100%;border-collapse:collapse"><tr><th style="text-align:left;padding:6px 12px;background:#f5f5f5">Item</th><th style="text-align:left;padding:6px 12px;background:#f5f5f5">Count</th></tr>${inventoryRows}</table>`
           : '<p style="color:#888">No inventory entered.</p>'}
-
         ${notes ? `<h3 style="color:#2c7a3e;margin-top:24px">Notes</h3><p style="background:#f9f9f9;padding:12px;border-radius:6px">${notes}</p>` : ''}
       </div>
     </div>`;
@@ -166,4 +156,6 @@ async function sendEmail({ facility, submitted_by, week_of, bathrooms_clean, win
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Checklist app running on http://localhost:${PORT}`));
+initDB()
+  .then(() => app.listen(PORT, () => console.log(`Checklist app running on http://localhost:${PORT}`)))
+  .catch(err => { console.error('DB init failed:', err); process.exit(1); });
