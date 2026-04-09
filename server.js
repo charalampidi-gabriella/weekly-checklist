@@ -61,13 +61,10 @@ app.post('/api/submit', async (req, res) => {
     ]
   });
 
-  try {
-    await sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes });
-  } catch (e) {
-    console.error('Email failed:', e.message);
-  }
-
   res.json({ success: true, id: Number(result.lastInsertRowid) });
+
+  sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes })
+    .catch(e => console.error('Email failed:', e.message));
 });
 
 // ── GET /api/submissions ──────────────────────────────────────────────────────
