@@ -82,6 +82,20 @@ app.get('/api/submissions', async (req, res) => {
   res.json(result.rows.map(r => ({ ...r, inventory: JSON.parse(r.inventory) })));
 });
 
+// ── GET /api/test-email ───────────────────────────────────────────────────────
+app.get('/api/test-email', async (req, res) => {
+  try {
+    await sendEmail({
+      facility: 'TEST', submitted_by: 'System', week_of: getWeekOf(),
+      bathrooms_clean: 1, windscreens_up: 1, windscreen_courts: null,
+      inventory: { 'Ball Cases': 0 }, notes: 'This is a test email.'
+    });
+    res.json({ success: true, message: 'Email sent to ' + process.env.ADMIN_EMAIL });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // ── GET /api/weeks ────────────────────────────────────────────────────────────
 app.get('/api/weeks', async (req, res) => {
   const result = await db.execute('SELECT DISTINCT week_of FROM submissions ORDER BY week_of DESC');
