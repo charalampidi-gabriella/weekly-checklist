@@ -4,8 +4,12 @@ const Database = require('better-sqlite3');
 const nodemailer = require('nodemailer');
 const path = require('path');
 
+const fs = require('fs');
+
 const app = express();
 const DB_PATH = process.env.DB_PATH || 'checklist.db';
+const DB_DIR = path.dirname(DB_PATH);
+if (DB_DIR !== '.' && !fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
 const db = new Database(DB_PATH);
 
 // ── Schema ────────────────────────────────────────────────────────────────────
