@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@libsql/client');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const path = require('path');
 
 const app = express();
@@ -113,15 +113,9 @@ function getWeekOf() {
 }
 
 async function sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes }) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !process.env.ADMIN_EMAIL) return;
+  if (!process.env.RESEND_API_KEY || !process.env.ADMIN_EMAIL) return;
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   const inventoryRows = Object.entries(inventory || {})
     .filter(([, v]) => v !== '' && v !== null && v !== undefined)
@@ -157,8 +151,8 @@ async function sendEmail({ facility, submitted_by, week_of, bathrooms_clean, win
       </div>
     </div>`;
 
-  await transporter.sendMail({
-    from: `"Facility Checklist" <${process.env.EMAIL_USER}>`,
+  await resend.emails.send({
+    from: 'Facility Checklist <onboarding@resend.dev>',
     to: process.env.ADMIN_EMAIL,
     subject: `[${facility}] Weekly Checklist — ${week_of} (${submitted_by})`,
     html
