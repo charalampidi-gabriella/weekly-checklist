@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@libsql/client');
-const { Resend } = require('resend');
 const path = require('path');
 
 const app = express();
@@ -10,20 +9,40 @@ const db = createClient({
   authToken: process.env.TURSO_TOKEN
 });
 
-// ── Schema ────────────────────────────────────────────────────────────────────
+const VALID_FACILITIES = ['SATC', 'Pharr', 'Wilco'];
+
+// Alert thresholds: item is "low" when count is AT or BELOW this number
+const ALERT_THRESHOLDS = {
+  reels: {
+    hawk_touch: 3, hawk_tour_rpet: 3, lynx_tour: 3,
+    lynx_touch: 3, velocity_mlt: 3, rpm_blast: 4,
+  },
+  prime_tour_grips: { white: 15, black: 15, pink: 15, blue: 15 },
+  pro_grips: { total: 20 },
+};
+
+// ── Schema ─────────────────────────────────────────────────────────────────────
 async function initDB() {
   await db.execute(`
-    CREATE TABLE IF NOT EXISTS submissions (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      facility          TEXT    NOT NULL,
-      submitted_by      TEXT    NOT NULL,
-      submitted_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-      week_of           TEXT    NOT NULL,
-      bathrooms_clean   INTEGER NOT NULL,
-      windscreens_up    INTEGER NOT NULL,
-      windscreen_courts TEXT,
-      inventory         TEXT NOT NULL,
-      notes             TEXT
+    CREATE TABLE IF NOT EXISTS inventory_counts (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      facility     TEXT    NOT NULL,
+      count_type   TEXT    NOT NULL,
+      submitted_by TEXT    NOT NULL,
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      items        TEXT    NOT NULL
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS inventory_pulls (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      facility  TEXT    NOT NULL,
+      category  TEXT    NOT NULL,
+      item      TEXT    NOT NULL,
+      quantity  INTEGER NOT NULL,
+      pulled_by TEXT    NOT NULL,
+      pulled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      notes     TEXT
     )
   `);
 }
@@ -31,20 +50,20 @@ async function initDB() {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Rate limiting (max 10 submits per IP per hour) ────────────────────────────
+// ── Rate limiting ──────────────────────────────────────────────────────────────
 const submitCounts = new Map();
 function rateLimit(req, res, next) {
   const ip = req.ip;
   const now = Date.now();
   const entry = submitCounts.get(ip) || { count: 0, reset: now + 3600000 };
   if (now > entry.reset) { entry.count = 0; entry.reset = now + 3600000; }
-  if (entry.count >= 10) return res.status(429).json({ error: 'Too many submissions. Try again later.' });
+  if (entry.count >= 20) return res.status(429).json({ error: 'Too many submissions. Try again later.' });
   entry.count++;
   submitCounts.set(ip, entry);
   next();
 }
 
-// ── Admin key middleware ───────────────────────────────────────────────────────
+// ── Admin key middleware ────────────────────────────────────────────────────────
 function requireAdmin(req, res, next) {
   const key = req.query.key || req.headers['x-admin-key'];
   if (!process.env.ADMIN_KEY || key !== process.env.ADMIN_KEY) {
@@ -53,135 +72,211 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ── POST /api/submit ──────────────────────────────────────────────────────────
-app.post('/api/submit', rateLimit, async (req, res) => {
-  const {
-    facility, submitted_by,
-    bathrooms_clean, windscreens_up, windscreen_courts,
-    inventory, notes
-  } = req.body;
-
-  const validFacilities = ['SATC', 'Pharr', 'Wilco'];
-  if (!facility || !validFacilities.includes(facility)) {
-    return res.status(400).json({ error: 'Invalid facility' });
+function sanitizeItems(items) {
+  const result = {};
+  if (!items || typeof items !== 'object') return result;
+  for (const [cat, subItems] of Object.entries(items)) {
+    if (typeof subItems !== 'object' || subItems === null) continue;
+    const cleanCat = String(cat).slice(0, 50);
+    result[cleanCat] = {};
+    for (const [itm, val] of Object.entries(subItems)) {
+      const n = parseInt(val);
+      result[cleanCat][String(itm).slice(0, 100)] = isNaN(n) || n < 0 ? 0 : n;
+    }
   }
-  if (!submitted_by || typeof submitted_by !== 'string' || submitted_by.trim().length === 0) {
-    return res.status(400).json({ error: 'submitted_by is required' });
-  }
-  if (submitted_by.length > 100) return res.status(400).json({ error: 'Name too long' });
-  if (notes && notes.length > 1000) return res.status(400).json({ error: 'Notes too long' });
-  if (windscreen_courts && windscreen_courts.length > 500) return res.status(400).json({ error: 'Courts field too long' });
-  // Sanitize inventory: values must be non-negative integers
-  const cleanInventory = {};
-  for (const [k, v] of Object.entries(inventory || {})) {
-    const n = parseInt(v);
-    cleanInventory[String(k).slice(0, 100)] = isNaN(n) || n < 0 ? 0 : n;
-  }
-
-  const week_of = getWeekOf();
-
-  const result = await db.execute({
-    sql: `INSERT INTO submissions
-            (facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [
-      facility,
-      submitted_by,
-      week_of,
-      bathrooms_clean ? 1 : 0,
-      windscreens_up  ? 1 : 0,
-      windscreen_courts || null,
-      JSON.stringify(cleanInventory),
-      notes || null
-    ]
-  });
-
-  res.json({ success: true, id: Number(result.lastInsertRowid) });
-
-  sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory: cleanInventory, notes })
-    .catch(e => console.error('Email failed:', e.message));
-});
-
-// ── GET /api/submissions ──────────────────────────────────────────────────────
-app.get('/api/submissions', requireAdmin, async (req, res) => {
-  const { week, facility } = req.query;
-  let sql = 'SELECT * FROM submissions WHERE 1=1';
-  const args = [];
-
-  if (week)     { sql += ' AND week_of = ?';  args.push(week); }
-  if (facility) { sql += ' AND facility = ?'; args.push(facility); }
-
-  sql += ' ORDER BY submitted_at DESC';
-
-  const result = await db.execute({ sql, args });
-  res.json(result.rows.map(r => ({ ...r, inventory: JSON.parse(r.inventory) })));
-});
-
-// ── GET /api/weeks ────────────────────────────────────────────────────────────
-app.get('/api/weeks', requireAdmin, async (req, res) => {
-  const result = await db.execute('SELECT DISTINCT week_of FROM submissions ORDER BY week_of DESC');
-  res.json(result.rows.map(r => r.week_of));
-});
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function getWeekOf() {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d);
-  monday.setDate(diff);
-  return monday.toISOString().split('T')[0];
+  return result;
 }
 
-async function sendEmail({ facility, submitted_by, week_of, bathrooms_clean, windscreens_up, windscreen_courts, inventory, notes }) {
-  if (!process.env.RESEND_API_KEY || !process.env.ADMIN_EMAIL) return;
+// ── POST /api/count ────────────────────────────────────────────────────────────
+app.post('/api/count', rateLimit, async (req, res) => {
+  try {
+    const { facility, count_type, submitted_by, items } = req.body;
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
+    if (!VALID_FACILITIES.includes(facility))
+      return res.status(400).json({ error: 'Invalid facility' });
+    if (!['biweekly', 'monthly'].includes(count_type))
+      return res.status(400).json({ error: 'Invalid count type' });
+    if (!submitted_by || typeof submitted_by !== 'string' || submitted_by.trim().length === 0)
+      return res.status(400).json({ error: 'Name is required' });
+    if (submitted_by.length > 100)
+      return res.status(400).json({ error: 'Name too long' });
 
-  const inventoryRows = Object.entries(inventory || {})
-    .filter(([, v]) => v !== '' && v !== null && v !== undefined)
-    .map(([k, v]) => `<tr><td style="padding:6px 12px;border-bottom:1px solid #eee">${k}</td><td style="padding:6px 12px;border-bottom:1px solid #eee;font-weight:600">${v}</td></tr>`)
-    .join('');
+    const sanitized = sanitizeItems(items);
 
-  const maintenanceRows = [
-    { label: 'Bathrooms clean', ok: bathrooms_clean, note: null },
-    { label: 'Windscreens up',  ok: windscreens_up,  note: !windscreens_up && windscreen_courts ? `Courts needing help: ${windscreen_courts}` : null }
-  ].map(({ label, ok, note }) => `
-    <tr>
-      <td style="padding:6px 12px;border-bottom:1px solid #eee">${label}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #eee">
-        ${ok ? '✅ Yes' : '❌ No'}
-        ${note ? `<br><span style="color:#888;font-size:13px">${note}</span>` : ''}
-      </td>
-    </tr>`).join('');
+    await db.execute({
+      sql: `INSERT INTO inventory_counts (facility, count_type, submitted_by, items) VALUES (?, ?, ?, ?)`,
+      args: [facility, count_type, submitted_by.trim(), JSON.stringify(sanitized)]
+    });
 
-  const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-      <div style="background:#2c7a3e;color:#fff;padding:20px 24px;border-radius:8px 8px 0 0">
-        <h2 style="margin:0">Weekly Report — ${facility}</h2>
-        <p style="margin:4px 0 0;opacity:.85">Week of ${week_of} &nbsp;·&nbsp; Submitted by ${submitted_by}</p>
-      </div>
-      <div style="background:#fff;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px;padding:24px">
-        <h3 style="color:#2c7a3e;margin-top:0">Maintenance</h3>
-        <table style="width:100%;border-collapse:collapse">${maintenanceRows}</table>
-        <h3 style="color:#2c7a3e;margin-top:24px">Inventory</h3>
-        ${inventoryRows
-          ? `<table style="width:100%;border-collapse:collapse"><tr><th style="text-align:left;padding:6px 12px;background:#f5f5f5">Item</th><th style="text-align:left;padding:6px 12px;background:#f5f5f5">Count</th></tr>${inventoryRows}</table>`
-          : '<p style="color:#888">No inventory entered.</p>'}
-        ${notes ? `<h3 style="color:#2c7a3e;margin-top:24px">Notes</h3><p style="background:#f9f9f9;padding:12px;border-radius:6px">${notes}</p>` : ''}
-      </div>
-    </div>`;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/count:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
-  await resend.emails.send({
-    from: 'Facility Checklist <onboarding@resend.dev>',
-    to: process.env.ADMIN_EMAIL,
-    subject: `[${facility}] Weekly Checklist — ${week_of} (${submitted_by})`,
-    html
-  });
+// ── POST /api/pull ─────────────────────────────────────────────────────────────
+app.post('/api/pull', rateLimit, async (req, res) => {
+  try {
+    const { facility, category, item, quantity, pulled_by, notes } = req.body;
+
+    if (!VALID_FACILITIES.includes(facility))
+      return res.status(400).json({ error: 'Invalid facility' });
+    if (!pulled_by || typeof pulled_by !== 'string' || pulled_by.trim().length === 0)
+      return res.status(400).json({ error: 'Name is required' });
+    if (pulled_by.length > 100)
+      return res.status(400).json({ error: 'Name too long' });
+    const qty = parseInt(quantity);
+    if (!qty || qty < 1 || qty > 10000)
+      return res.status(400).json({ error: 'Invalid quantity' });
+    if (!category || typeof category !== 'string' || category.length > 50)
+      return res.status(400).json({ error: 'Invalid category' });
+    if (!item || typeof item !== 'string' || item.length > 100)
+      return res.status(400).json({ error: 'Invalid item' });
+
+    const cleanNotes = notes ? String(notes).trim().slice(0, 500) : null;
+
+    await db.execute({
+      sql: `INSERT INTO inventory_pulls (facility, category, item, quantity, pulled_by, notes) VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [facility, category, item, qty, pulled_by.trim(), cleanNotes]
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/pull:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── Inventory state helper ─────────────────────────────────────────────────────
+async function getInventoryState(facility) {
+  const [bwRows, moRows] = await Promise.all([
+    db.execute({
+      sql: `SELECT * FROM inventory_counts WHERE facility = ? AND count_type = 'biweekly' ORDER BY submitted_at DESC LIMIT 1`,
+      args: [facility]
+    }),
+    db.execute({
+      sql: `SELECT * FROM inventory_counts WHERE facility = ? AND count_type = 'monthly' ORDER BY submitted_at DESC LIMIT 1`,
+      args: [facility]
+    })
+  ]);
+
+  const state = {};
+
+  for (const [type, rows] of [['biweekly', bwRows.rows], ['monthly', moRows.rows]]) {
+    if (rows.length === 0) { state[type] = null; continue; }
+
+    const count = rows[0];
+    const items = JSON.parse(count.items);
+
+    const categories = type === 'biweekly'
+      ? ['reels', 'ball_cases']
+      : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
+
+    const pullRows = await db.execute({
+      sql: `SELECT category, item, SUM(quantity) as total
+            FROM inventory_pulls
+            WHERE facility = ? AND category IN (${categories.map(() => '?').join(',')}) AND pulled_at > ?
+            GROUP BY category, item`,
+      args: [facility, ...categories, count.submitted_at]
+    });
+
+    const pullsSince = {};
+    for (const row of pullRows.rows) {
+      if (!pullsSince[row.category]) pullsSince[row.category] = {};
+      pullsSince[row.category][row.item] = Number(row.total);
+    }
+
+    const estimated = JSON.parse(JSON.stringify(items));
+    for (const [cat, subItems] of Object.entries(pullsSince)) {
+      for (const [itm, pulled] of Object.entries(subItems)) {
+        if (estimated[cat]?.[itm] !== undefined) {
+          estimated[cat][itm] = Math.max(0, estimated[cat][itm] - pulled);
+        }
+      }
+    }
+
+    const alerts = [];
+    for (const [cat, thresholds] of Object.entries(ALERT_THRESHOLDS)) {
+      if (!estimated[cat]) continue;
+      for (const [itm, threshold] of Object.entries(thresholds)) {
+        if (estimated[cat][itm] !== undefined && estimated[cat][itm] <= threshold) {
+          alerts.push({ category: cat, item: itm, threshold, current: estimated[cat][itm] });
+        }
+      }
+    }
+
+    state[type] = {
+      last_count: { date: count.submitted_at, submitted_by: count.submitted_by, items },
+      pulls_since: pullsSince,
+      estimated,
+      alerts
+    };
+  }
+
+  return state;
 }
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+// ── GET /api/inventory ─────────────────────────────────────────────────────────
+app.get('/api/inventory', requireAdmin, async (req, res) => {
+  try {
+    const result = {};
+    for (const fac of VALID_FACILITIES) {
+      result[fac] = await getInventoryState(fac);
+    }
+
+    // Combined totals across all facilities
+    const combined = { biweekly: null, monthly: null };
+    for (const type of ['biweekly', 'monthly']) {
+      const totalEst = {};
+      const allAlerts = [];
+      let hasData = false;
+
+      for (const fac of VALID_FACILITIES) {
+        const s = result[fac][type];
+        if (!s) continue;
+        hasData = true;
+        for (const [cat, itms] of Object.entries(s.estimated)) {
+          if (!totalEst[cat]) totalEst[cat] = {};
+          for (const [itm, qty] of Object.entries(itms)) {
+            totalEst[cat][itm] = (totalEst[cat][itm] || 0) + qty;
+          }
+        }
+        allAlerts.push(...s.alerts.map(a => ({ ...a, facility: fac })));
+      }
+
+      if (hasData) combined[type] = { estimated: totalEst, alerts: allAlerts };
+    }
+    result.combined = combined;
+
+    res.json(result);
+  } catch (err) {
+    console.error('GET /api/inventory:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── GET /api/pulls ─────────────────────────────────────────────────────────────
+app.get('/api/pulls', requireAdmin, async (req, res) => {
+  try {
+    const { facility } = req.query;
+    const args = [];
+    let sql = 'SELECT * FROM inventory_pulls';
+    if (facility && VALID_FACILITIES.includes(facility)) {
+      sql += ' WHERE facility = ?';
+      args.push(facility);
+    }
+    sql += ' ORDER BY pulled_at DESC LIMIT 200';
+    const rows = await db.execute({ sql, args });
+    res.json(rows.rows);
+  } catch (err) {
+    console.error('GET /api/pulls:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 initDB()
-  .then(() => app.listen(PORT, () => console.log(`Checklist app running on http://localhost:${PORT}`)))
+  .then(() => app.listen(PORT, () => console.log(`Inventory app running on http://localhost:${PORT}`)))
   .catch(err => { console.error('DB init failed:', err); process.exit(1); });

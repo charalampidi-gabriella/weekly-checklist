@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Log Inventory Pull</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f1;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+    header {
+      background: #2c7a3e;
+      color: #fff;
+      padding: 16px 16px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .back-btn {
+      color: rgba(255,255,255,.85);
+      text-decoration: none;
+      font-size: 22px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    header .header-text h1 { font-size: 20px; font-weight: 700; }
+    header .header-text p  { font-size: 13px; opacity: .8; margin-top: 2px; }
+
+    main { max-width: 520px; margin: 0 auto; padding: 16px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2c7a3e;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e8f0ea;
+    }
+
+    .facility-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .facility-btn {
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      padding: 14px 6px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #fff;
+      color: #555;
+      transition: all .15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .facility-btn.selected {
+      border-color: #2c7a3e;
+      background: #2c7a3e;
+      color: #fff;
+    }
+
+    .field-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 8px;
+    }
+    .field-label + .field-label { margin-top: 14px; }
+
+    select, input[type="text"], textarea {
+      width: 100%;
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+      background: #fff;
+      color: #1a1a1a;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 38px;
+    }
+    select:focus, input[type="text"]:focus, textarea:focus { border-color: #2c7a3e; }
+    select:disabled { background-color: #f5f5f5; color: #999; }
+    textarea { resize: vertical; min-height: 72px; }
+
+    .spacer { height: 14px; }
+
+    /* Quantity control */
+    .qty-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .qty-btn {
+      width: 52px;
+      height: 52px;
+      border: none;
+      background: #f5f5f5;
+      font-size: 24px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+    }
+    .qty-btn:active { background: #e0e0e0; }
+    .qty-display {
+      flex: 1;
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      border: none;
+      background: #fff;
+      padding: 0 8px;
+      -moz-appearance: textfield;
+    }
+    .qty-display::-webkit-outer-spin-button,
+    .qty-display::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .submit-btn {
+      width: 100%;
+      background: #c0392b;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 18px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+      -webkit-tap-highlight-color: transparent;
+      margin-bottom: 32px;
+    }
+    .submit-btn:active { background: #a93226; }
+    .submit-btn:disabled { background: #e8a09a; cursor: not-allowed; }
+
+    .error-msg {
+      color: #c0392b;
+      font-size: 13px;
+      margin-top: 6px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    #success-screen {
+      display: none;
+      text-align: center;
+      padding: 70px 20px;
+    }
+    #success-screen .checkmark { font-size: 72px; margin-bottom: 16px; }
+    #success-screen h2 { font-size: 24px; margin-bottom: 8px; }
+    #success-screen p  { color: #666; margin-bottom: 24px; }
+    #success-screen .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    #success-screen button {
+      border: none;
+      border-radius: 10px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-again { background: #c0392b; color: #fff; }
+    .btn-home  { background: #e8f0ea; color: #2c7a3e; }
+
+    .summary-box {
+      background: #fdf2f1;
+      border: 1px solid #f5c6c2;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 15px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .summary-box strong { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="back-btn" href="index.html">‹</a>
+  <div class="header-text">
+    <h1>Log Inventory Pull</h1>
+    <p>Record items taken from stock</p>
+  </div>
+</header>
+
+<div id="form-area">
+<main>
+
+  <!-- FACILITY -->
+  <div class="card">
+    <h2>Facility</h2>
+    <div class="facility-grid">
+      <div class="facility-btn" data-facility="SATC">SATC</div>
+      <div class="facility-btn" data-facility="Pharr">Pharr</div>
+      <div class="facility-btn" data-facility="Wilco">Wilco</div>
+    </div>
+    <div class="error-msg" id="err-facility">Please select a facility.</div>
+  </div>
+
+  <!-- ITEM -->
+  <div class="card">
+    <h2>Item</h2>
+
+    <div class="field-label">Category</div>
+    <select id="category-select" onchange="onCategoryChange()">
+      <option value="">Select a category...</option>
+      <option value="reels">String Reels</option>
+      <option value="ball_cases">Ball Cases</option>
+      <option value="prime_tour_grips">Prime Tour Grips</option>
+      <option value="pro_grips">Pro Grips</option>
+      <option value="wristbands">Wristbands</option>
+      <option value="headbands">Headbands</option>
+      <option value="rackets">Rackets</option>
+    </select>
+
+    <div class="spacer"></div>
+    <div class="field-label">Item</div>
+    <select id="item-select" disabled>
+      <option value="">Select a category first...</option>
+    </select>
+
+    <div class="error-msg" id="err-item">Please select a category and item.</div>
+  </div>
+
+  <!-- QUANTITY -->
+  <div class="card">
+    <h2>Quantity Pulled</h2>
+    <div class="qty-row">
+      <button type="button" class="qty-btn" id="qty-dec">−</button>
+      <input class="qty-display" type="number" id="quantity" value="1" min="1">
+      <button type="button" class="qty-btn" id="qty-inc">+</button>
+    </div>
+    <div class="error-msg" id="err-qty">Quantity must be at least 1.</div>
+  </div>
+
+  <!-- NAME & NOTES -->
+  <div class="card">
+    <h2>Details</h2>
+    <div class="field-label">Your Name</div>
+    <input type="text" id="pulled_by" placeholder="Enter your name" autocomplete="name">
+    <div class="error-msg" id="err-name">Please enter your name.</div>
+
+    <div class="spacer"></div>
+    <div class="field-label">Notes (optional)</div>
+    <textarea id="notes" placeholder="e.g. Used for stringing on court 4..."></textarea>
+  </div>
+
+  <div class="summary-box" id="summary-box"></div>
+
+  <button class="submit-btn" id="submit-btn" onclick="submitForm()">Log Pull</button>
+
+</main>
+</div>
+
+<!-- SUCCESS -->
+<div id="success-screen">
+  <div class="checkmark">📦</div>
+  <h2>Pull Logged!</h2>
+  <p id="success-detail">The inventory pull has been recorded.</p>
+  <div class="btn-row">
+    <button class="btn-again" onclick="location.reload()">Log Another</button>
+    <button class="btn-home" onclick="location.href='index.html'">Home</button>
+  </div>
+</div>
+
+<script>
+  const ITEMS_BY_CATEGORY = {
+    reels: [
+      { key: 'hawk_touch',    label: 'Hawk Touch' },
+      { key: 'hawk_tour_rpet', label: 'Hawk Tour RPET' },
+      { key: 'lynx_tour',     label: 'Lynx Tour' },
+      { key: 'lynx_touch',    label: 'Lynx Touch' },
+      { key: 'velocity_mlt',  label: 'Velocity MLT' },
+      { key: 'rpm_blast',     label: 'RPM Blast' },
+    ],
+    ball_cases: [
+      { key: 'full_cases', label: 'Full Cases' },
+      { key: 'open_cans',  label: 'Open Cans' },
+    ],
+    prime_tour_grips: [
+      { key: 'white', label: 'White' },
+      { key: 'black', label: 'Black' },
+      { key: 'pink',  label: 'Pink' },
+      { key: 'blue',  label: 'Blue' },
+    ],
+    pro_grips: [
+      { key: 'total', label: 'Pro Grips (total)' },
+    ],
+    wristbands: [
+      { key: '2_5in_black', label: '2.5in Black' },
+      { key: '2_5in_white', label: '2.5in White' },
+      { key: '5in_black',   label: '5in Black' },
+      { key: '5in_white',   label: '5in White' },
+    ],
+    headbands: [
+      { key: 'black', label: 'Black' },
+      { key: 'white', label: 'White' },
+    ],
+    rackets: [
+      { key: 'boom_2026',   label: 'Boom 2026' },
+      { key: 'speed_2026',  label: 'Speed 2026' },
+      { key: 'speed_legend', label: 'Speed Legend' },
+      { key: 'gravity',     label: 'Gravity' },
+      { key: 'radical',     label: 'Radical' },
+      { key: 'extreme',     label: 'Extreme' },
+      { key: 'boom_2024',   label: 'Boom 2024' },
+      { key: 'boom_neon',   label: 'Boom Neon' },
+      { key: 'boom_ashe',   label: 'Boom Ashe' },
+    ],
+  };
+
+  let selectedFacility = null;
+
+  document.querySelectorAll('.facility-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.facility-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedFacility = btn.dataset.facility;
+      hide('err-facility');
+      updateSummary();
+    });
+  });
+
+  function onCategoryChange() {
+    const cat = document.getElementById('category-select').value;
+    const itemSel = document.getElementById('item-select');
+
+    if (!cat) {
+      itemSel.disabled = true;
+      itemSel.innerHTML = '<option value="">Select a category first...</option>';
+    } else {
+      itemSel.disabled = false;
+      const items = ITEMS_BY_CATEGORY[cat] || [];
+      itemSel.innerHTML = '<option value="">Select an item...</option>' +
+        items.map(i => `<option value="${i.key}">${i.label}</option>`).join('');
+    }
+    hide('err-item');
+    updateSummary();
+  }
+
+  document.getElementById('item-select').addEventListener('change', () => {
+    hide('err-item');
+    updateSummary();
+  });
+
+  document.getElementById('qty-dec').addEventListener('click', () => {
+    const inp = document.getElementById('quantity');
+    inp.value = Math.max(1, (parseInt(inp.value) || 1) - 1);
+    updateSummary();
+  });
+  document.getElementById('qty-inc').addEventListener('click', () => {
+    const inp = document.getElementById('quantity');
+    inp.value = (parseInt(inp.value) || 0) + 1;
+    updateSummary();
+  });
+  document.getElementById('quantity').addEventListener('input', updateSummary);
+
+  function updateSummary() {
+    const cat = document.getElementById('category-select').value;
+    const itemSel = document.getElementById('item-select');
+    const qty = parseInt(document.getElementById('quantity').value) || 0;
+    const box = document.getElementById('summary-box');
+
+    if (selectedFacility && cat && itemSel.value && qty > 0) {
+      const itemLabel = itemSel.options[itemSel.selectedIndex]?.text || itemSel.value;
+      const catLabel = document.getElementById('category-select').options[
+        document.getElementById('category-select').selectedIndex
+      ]?.text || cat;
+      box.style.display = 'block';
+      box.innerHTML = `Logging <strong>${qty}</strong> × <strong>${itemLabel}</strong> (${catLabel}) pulled from <strong>${selectedFacility}</strong>`;
+    } else {
+      box.style.display = 'none';
+    }
+  }
+
+  function show(id) { document.getElementById(id).classList.add('visible'); }
+  function hide(id) { document.getElementById(id).classList.remove('visible'); }
+
+  async function submitForm() {
+    let valid = true;
+
+    if (!selectedFacility) { show('err-facility'); valid = false; }
+
+    const cat = document.getElementById('category-select').value;
+    const item = document.getElementById('item-select').value;
+    if (!cat || !item) { show('err-item'); valid = false; }
+
+    const qty = parseInt(document.getElementById('quantity').value);
+    if (!qty || qty < 1) { show('err-qty'); valid = false; }
+
+    const name = document.getElementById('pulled_by').value.trim();
+    if (!name) { show('err-name'); valid = false; }
+
+    if (!valid) return;
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Logging...';
+
+    try {
+      const res = await fetch('/api/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility: selectedFacility,
+          category: cat,
+          item,
+          quantity: qty,
+          pulled_by: name,
+          notes: document.getElementById('notes').value.trim() || null
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Server error');
+      }
+
+      const itemLabel = document.getElementById('item-select').options[
+        document.getElementById('item-select').selectedIndex
+      ]?.text || item;
+      document.getElementById('success-detail').textContent =
+        `${qty} × ${itemLabel} pulled from ${selectedFacility} has been recorded.`;
+
+      document.getElementById('form-area').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'block';
+      window.scrollTo(0, 0);
+    } catch (e) {
+      alert('Error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Log Pull';
+    }
+  }
+</script>
+</body>
+</html>

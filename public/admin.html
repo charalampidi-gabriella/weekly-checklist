@@ -3,249 +3,693 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin — Weekly Checklist</title>
+  <title>Inventory Dashboard</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f1; color: #1a1a1a; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f1;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
 
     header {
       background: #2c7a3e;
       color: #fff;
-      padding: 20px 24px;
+      padding: 16px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
       gap: 12px;
+      flex-wrap: wrap;
     }
+    header .title-area { display: flex; align-items: center; gap: 12px; }
+    .back-btn { color: rgba(255,255,255,.85); text-decoration: none; font-size: 22px; line-height: 1; }
     header h1 { font-size: 20px; font-weight: 700; }
 
-    .filters {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .filters select {
-      border: none;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 14px;
-      font-family: inherit;
-      background: rgba(255,255,255,.2);
-      color: #fff;
-      cursor: pointer;
-      outline: none;
-    }
-    .filters select option { background: #2c7a3e; color: #fff; }
-
-    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-    .stat-card {
+    #key-prompt {
       background: #fff;
-      border-radius: 10px;
-      padding: 16px;
+      border-radius: 14px;
+      padding: 40px 24px;
+      max-width: 400px;
+      margin: 40px auto;
       text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+      box-shadow: 0 2px 8px rgba(0,0,0,.1);
     }
-    .stat-card .num { font-size: 28px; font-weight: 800; color: #2c7a3e; }
-    .stat-card .lbl { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
-
-    .submissions { display: flex; flex-direction: column; gap: 16px; }
-
-    .submission-card {
-      background: #fff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    #key-prompt h2 { font-size: 20px; margin-bottom: 8px; }
+    #key-prompt p  { color: #666; font-size: 14px; margin-bottom: 20px; }
+    #key-prompt input {
+      width: 100%;
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      margin-bottom: 12px;
     }
-    .submission-header {
+    #key-prompt input:focus { border-color: #2c7a3e; }
+    #key-prompt button {
+      width: 100%;
       background: #2c7a3e;
       color: #fff;
-      padding: 14px 18px;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+
+    /* Alert banner */
+    .alert-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .alert-banner h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #991b1b;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 10px;
+    }
+    .alert-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .alert-chip {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 13px;
+      color: #7f1d1d;
+      font-weight: 600;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 6px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow-x: auto;
+    }
+    .tab-btn {
+      flex: 1;
+      min-width: 80px;
+      border: none;
+      background: none;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #555;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      background: #2c7a3e;
+      color: #fff;
+    }
+    .tab-btn .alert-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #ef4444;
+      border-radius: 50%;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+
+    /* Inventory section */
+    .inv-section {
+      background: #fff;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+    .inv-section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid #f0f0f0;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 8px;
     }
-    .submission-header .facility { font-size: 18px; font-weight: 700; }
-    .submission-header .meta { font-size: 13px; opacity: .85; }
-
-    .submission-body { padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 600px) { .submission-body { grid-template-columns: 1fr; } }
-
-    .section-title {
-      font-size: 12px;
+    .inv-section-header h2 {
+      font-size: 14px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .06em;
       color: #2c7a3e;
-      margin-bottom: 10px;
+    }
+    .last-count-info {
+      font-size: 12px;
+      color: #888;
+    }
+    .last-count-info strong { color: #555; }
+    .no-count-msg {
+      padding: 24px 18px;
+      color: #aaa;
+      font-size: 14px;
+      font-style: italic;
     }
 
-    .check-row {
+    /* Inventory table */
+    table.inv-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    table.inv-table th {
+      text-align: left;
+      padding: 10px 18px;
+      background: #f8faf8;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #888;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    table.inv-table th:not(:first-child) { text-align: right; }
+    table.inv-table td {
+      padding: 10px 18px;
+      border-bottom: 1px solid #f9f9f9;
+      vertical-align: middle;
+    }
+    table.inv-table td:not(:first-child) { text-align: right; }
+    table.inv-table tr:last-child td { border-bottom: none; }
+    table.inv-table tr.alert-row td { background: #fef9f9; }
+    table.inv-table tr.alert-row td:first-child { border-left: 3px solid #ef4444; padding-left: 15px; }
+    table.inv-table .cat-header td {
+      background: #f5f5f5;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #999;
+      padding: 7px 18px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 100px;
+    }
+    .status-ok  { background: #dcfce7; color: #166534; }
+    .status-low { background: #fee2e2; color: #991b1b; }
+    .status-na  { background: #f5f5f5; color: #aaa; }
+    .est-num { font-size: 16px; font-weight: 800; }
+    .est-low { color: #dc2626; }
+
+    /* Pull history */
+    .pull-history {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    .pull-history-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #f0f0f0;
       display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 8px;
-      font-size: 14px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
     }
-    .check-row .icon { flex-shrink: 0; }
-    .check-row .note { color: #888; font-size: 12px; margin-top: 2px; }
-
-    table.inv { width: 100%; border-collapse: collapse; font-size: 14px; }
-    table.inv td { padding: 5px 0; border-bottom: 1px solid #f0f0f0; }
-    table.inv td:last-child { text-align: right; font-weight: 700; }
-    table.inv tr:last-child td { border-bottom: none; }
-
-    .notes-box {
-      background: #f9f9f9;
+    .pull-history-header h2 {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #555;
+    }
+    .pull-filter {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .pull-filter-btn {
+      border: 1px solid #d0d0d0;
       border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 14px;
-      color: #444;
-      grid-column: 1 / -1;
+      padding: 5px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #fff;
+      color: #555;
+      transition: all .15s;
+    }
+    .pull-filter-btn.active {
+      border-color: #2c7a3e;
+      background: #2c7a3e;
+      color: #fff;
     }
 
-    .empty { text-align: center; padding: 60px 20px; color: #888; font-size: 16px; }
+    table.pull-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.pull-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background: #f8faf8;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #888;
+      border-bottom: 1px solid #f0f0f0;
+      white-space: nowrap;
+    }
+    table.pull-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f9f9f9;
+      vertical-align: top;
+    }
+    table.pull-table tr:last-child td { border-bottom: none; }
+    .fac-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: #e8f5ec;
+      color: #2c7a3e;
+    }
+    .pull-qty { font-weight: 800; font-size: 15px; }
+    .pull-notes { color: #888; font-size: 12px; margin-top: 2px; }
+
+    .empty-state { padding: 30px; text-align: center; color: #aaa; font-size: 14px; }
+    .loading { padding: 30px; text-align: center; color: #aaa; font-size: 14px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    @media (max-width: 600px) {
+      table.pull-table th:nth-child(5),
+      table.pull-table td:nth-child(5) { display: none; }
+    }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>Admin Dashboard</h1>
-  <div class="filters">
-    <select id="filter-week" onchange="load()">
-      <option value="">All weeks</option>
-    </select>
-    <select id="filter-facility" onchange="load()">
-      <option value="">All facilities</option>
-      <option value="SATC">SATC</option>
-      <option value="Pharr">Pharr</option>
-      <option value="Wilco">Wilco</option>
-    </select>
+  <div class="title-area">
+    <a class="back-btn" href="index.html">‹</a>
+    <h1>Inventory Dashboard</h1>
   </div>
 </header>
 
-<main>
-  <div class="stats" id="stats"></div>
-  <div class="submissions" id="submissions"><div class="empty">Loading...</div></div>
+<div id="key-prompt" style="display:none">
+  <h2>Admin Access</h2>
+  <p>Enter your admin key to view the inventory dashboard.</p>
+  <input type="password" id="key-input" placeholder="Admin key" onkeydown="if(event.key==='Enter')enterKey()">
+  <button onclick="enterKey()">View Dashboard</button>
+</div>
+
+<main id="main-area" style="display:none">
+  <div class="alert-banner" id="alert-banner">
+    <h3>Low Stock Alerts</h3>
+    <div class="alert-chips" id="alert-chips"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('SATC')">SATC</button>
+    <button class="tab-btn" onclick="switchTab('Pharr')">Pharr</button>
+    <button class="tab-btn" onclick="switchTab('Wilco')">Wilco</button>
+    <button class="tab-btn" onclick="switchTab('combined')">All Facilities</button>
+  </div>
+
+  <div id="tab-SATC"     class="tab-content active"><div class="loading">Loading...</div></div>
+  <div id="tab-Pharr"    class="tab-content"><div class="loading">Loading...</div></div>
+  <div id="tab-Wilco"    class="tab-content"><div class="loading">Loading...</div></div>
+  <div id="tab-combined" class="tab-content"><div class="loading">Loading...</div></div>
+
+  <div class="pull-history">
+    <div class="pull-history-header">
+      <h2>Pull History</h2>
+      <div class="pull-filter">
+        <button class="pull-filter-btn active" onclick="filterPulls('')">All</button>
+        <button class="pull-filter-btn" onclick="filterPulls('SATC')">SATC</button>
+        <button class="pull-filter-btn" onclick="filterPulls('Pharr')">Pharr</button>
+        <button class="pull-filter-btn" onclick="filterPulls('Wilco')">Wilco</button>
+      </div>
+    </div>
+    <div id="pull-history-body"><div class="loading">Loading...</div></div>
+  </div>
 </main>
 
 <script>
-  const ADMIN_KEY = new URLSearchParams(location.search).get('key') || '';
+  // ── Item catalog (for display names) ──────────────────────────────────────────
+  const CATALOG = {
+    reels: {
+      label: 'String Reels',
+      items: {
+        hawk_touch: 'Hawk Touch', hawk_tour_rpet: 'Hawk Tour RPET',
+        lynx_tour: 'Lynx Tour', lynx_touch: 'Lynx Touch',
+        velocity_mlt: 'Velocity MLT', rpm_blast: 'RPM Blast',
+      }
+    },
+    ball_cases: {
+      label: 'Ball Cases',
+      items: { full_cases: 'Full Cases', open_cans: 'Open Cans' }
+    },
+    prime_tour_grips: {
+      label: 'Prime Tour Grips',
+      items: { white: 'White', black: 'Black', pink: 'Pink', blue: 'Blue' }
+    },
+    pro_grips: {
+      label: 'Pro Grips',
+      items: { total: 'Pro Grips (total)' }
+    },
+    wristbands: {
+      label: 'Wristbands',
+      items: {
+        '2_5in_black': '2.5in Black', '2_5in_white': '2.5in White',
+        '5in_black': '5in Black', '5in_white': '5in White',
+      }
+    },
+    headbands: {
+      label: 'Headbands',
+      items: { black: 'Black', white: 'White' }
+    },
+    rackets: {
+      label: 'Rackets',
+      items: {
+        boom_2026: 'Boom 2026', speed_2026: 'Speed 2026', speed_legend: 'Speed Legend',
+        gravity: 'Gravity', radical: 'Radical', extreme: 'Extreme',
+        boom_2024: 'Boom 2024', boom_neon: 'Boom Neon', boom_ashe: 'Boom Ashe',
+      }
+    }
+  };
+
+  const BIWEEKLY_CATS  = ['reels', 'ball_cases'];
+  const MONTHLY_CATS   = ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
+
+  let ADMIN_KEY = new URLSearchParams(location.search).get('key') || '';
+  let inventoryData = null;
+  let allPulls = [];
+  let currentTab = 'SATC';
+
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  function enterKey() {
+    const k = document.getElementById('key-input').value.trim();
+    if (k) { ADMIN_KEY = k; init(); }
+  }
+
+  async function init() {
+    document.getElementById('key-prompt').style.display = 'none';
+    document.getElementById('main-area').style.display = 'block';
+
+    try {
+      const [invRes, pullRes] = await Promise.all([
+        fetch('/api/inventory?key=' + encodeURIComponent(ADMIN_KEY)),
+        fetch('/api/pulls?key='      + encodeURIComponent(ADMIN_KEY)),
+      ]);
+
+      if (invRes.status === 401) {
+        document.getElementById('main-area').style.display = 'none';
+        document.getElementById('key-prompt').style.display = 'block';
+        document.getElementById('key-prompt').innerHTML += '<p style="color:#c0392b;margin-top:8px">Invalid admin key.</p>';
+        return;
+      }
+
+      inventoryData = await invRes.json();
+      allPulls = await pullRes.json();
+
+      renderAlerts();
+      renderAllTabs();
+      renderPulls('');
+    } catch (e) {
+      document.getElementById('tab-SATC').innerHTML = '<div class="empty-state">Failed to load data. Check your connection.</div>';
+    }
+  }
+
+  // ── Alerts banner ───────────────────────────────────────────────────────────
+  function renderAlerts() {
+    const chips = [];
+    for (const fac of ['SATC', 'Pharr', 'Wilco']) {
+      const d = inventoryData[fac];
+      for (const type of ['biweekly', 'monthly']) {
+        if (d[type]?.alerts?.length) {
+          d[type].alerts.forEach(a => {
+            const label = itemLabel(a.category, a.item);
+            chips.push(`<div class="alert-chip">${fac}: ${label} — ${a.current} left (order at ≤${a.threshold})</div>`);
+          });
+        }
+      }
+    }
+
+    if (chips.length) {
+      document.getElementById('alert-banner').style.display = 'block';
+      document.getElementById('alert-chips').innerHTML = chips.join('');
+    }
+
+    // Add alert dots to tabs
+    const facAlerts = { SATC: false, Pharr: false, Wilco: false };
+    for (const fac of ['SATC', 'Pharr', 'Wilco']) {
+      const d = inventoryData[fac];
+      if (d.biweekly?.alerts?.length || d.monthly?.alerts?.length) facAlerts[fac] = true;
+    }
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      const fac = btn.textContent.trim();
+      if (facAlerts[fac]) {
+        if (!btn.querySelector('.alert-dot')) {
+          btn.appendChild(Object.assign(document.createElement('span'), { className: 'alert-dot' }));
+        }
+      }
+    });
+  }
+
+  // ── Tabs ────────────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.trim().startsWith(tab === 'combined' ? 'All' : tab));
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+  }
+
+  function renderAllTabs() {
+    for (const fac of ['SATC', 'Pharr', 'Wilco']) {
+      document.getElementById('tab-' + fac).innerHTML = renderFacilityTab(fac, inventoryData[fac]);
+    }
+    document.getElementById('tab-combined').innerHTML = renderCombinedTab(inventoryData.combined);
+  }
+
+  // ── Facility tab ────────────────────────────────────────────────────────────
+  function renderFacilityTab(fac, data) {
+    return renderSection('Bi-Weekly Items', data.biweekly, BIWEEKLY_CATS) +
+           renderSection('Monthly Items',   data.monthly,  MONTHLY_CATS);
+  }
+
+  function renderSection(title, state, categories) {
+    let header = '';
+    if (state) {
+      const d = formatDate(state.last_count.date);
+      header = `Last counted: <strong>${d}</strong> by <strong>${esc(state.last_count.submitted_by)}</strong>`;
+    }
+
+    let rows = '';
+    for (const cat of categories) {
+      const catDef = CATALOG[cat];
+      if (!catDef) continue;
+
+      rows += `<tr class="cat-header"><td colspan="5">${catDef.label}</td></tr>`;
+
+      for (const [itemKey, itemName] of Object.entries(catDef.items)) {
+        const counted  = state?.last_count?.items?.[cat]?.[itemKey];
+        const pulled   = state?.pulls_since?.[cat]?.[itemKey] || 0;
+        const est      = state?.estimated?.[cat]?.[itemKey];
+        const isAlert  = state?.alerts?.some(a => a.category === cat && a.item === itemKey);
+        const alertThr = state?.alerts?.find(a => a.category === cat && a.item === itemKey)?.threshold;
+
+        const rowClass = isAlert ? ' class="alert-row"' : '';
+        const estStr = est !== undefined
+          ? `<span class="est-num ${isAlert ? 'est-low' : ''}">${est}</span>`
+          : '<span style="color:#ccc">—</span>';
+        const countedStr = counted !== undefined ? counted : '<span style="color:#ccc">—</span>';
+        const pulledStr  = pulled > 0 ? `<span style="color:#c0392b">−${pulled}</span>` : '<span style="color:#ccc">0</span>';
+
+        let statusHtml = '';
+        if (est === undefined) {
+          statusHtml = '<span class="status-badge status-na">No data</span>';
+        } else if (isAlert) {
+          statusHtml = `<span class="status-badge status-low">LOW ≤${alertThr}</span>`;
+        } else {
+          statusHtml = '<span class="status-badge status-ok">OK</span>';
+        }
+
+        rows += `<tr${rowClass}>
+          <td>${esc(itemName)}</td>
+          <td>${countedStr}</td>
+          <td>${pulledStr}</td>
+          <td>${estStr}</td>
+          <td>${statusHtml}</td>
+        </tr>`;
+      }
+    }
+
+    return `
+      <div class="inv-section">
+        <div class="inv-section-header">
+          <h2>${title}</h2>
+          <div class="last-count-info">${header || 'No count recorded yet'}</div>
+        </div>
+        ${rows
+          ? `<table class="inv-table">
+              <thead><tr>
+                <th>Item</th>
+                <th>Last Count</th>
+                <th>Pulled Since</th>
+                <th>Est. Remaining</th>
+                <th>Status</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+             </table>`
+          : '<div class="no-count-msg">No count data available.</div>'}
+      </div>`;
+  }
+
+  // ── Combined tab ────────────────────────────────────────────────────────────
+  function renderCombinedTab(combined) {
+    if (!combined || (!combined.biweekly && !combined.monthly)) {
+      return '<div class="empty-state">No data across any facility yet.</div>';
+    }
+
+    function renderCombinedSection(title, state, categories) {
+      if (!state) return `<div class="inv-section"><div class="no-count-msg">${title}: No data yet.</div></div>`;
+
+      let rows = '';
+      for (const cat of categories) {
+        const catDef = CATALOG[cat];
+        if (!catDef) continue;
+        rows += `<tr class="cat-header"><td colspan="3">${catDef.label}</td></tr>`;
+        for (const [itemKey, itemName] of Object.entries(catDef.items)) {
+          const est = state?.estimated?.[cat]?.[itemKey];
+          const perFacAlerts = (state?.alerts || []).filter(a => a.category === cat && a.item === itemKey);
+          const isAlert = perFacAlerts.length > 0;
+          const rowClass = isAlert ? ' class="alert-row"' : '';
+          const estStr = est !== undefined
+            ? `<span class="est-num ${isAlert ? 'est-low' : ''}">${est}</span>`
+            : '<span style="color:#ccc">—</span>';
+          const alertsStr = isAlert
+            ? perFacAlerts.map(a => `<span class="alert-chip" style="font-size:11px;padding:2px 8px">${a.facility}: ${a.current} left</span>`).join(' ')
+            : '<span class="status-badge status-ok">OK</span>';
+
+          rows += `<tr${rowClass}>
+            <td>${esc(itemName)}</td>
+            <td>${estStr}</td>
+            <td>${alertsStr}</td>
+          </tr>`;
+        }
+      }
+
+      return `<div class="inv-section">
+        <div class="inv-section-header">
+          <h2>${title} — All Facilities Combined</h2>
+          <div class="last-count-info">Sum of estimated remaining across SATC, Pharr &amp; Wilco</div>
+        </div>
+        <table class="inv-table">
+          <thead><tr><th>Item</th><th>Total Est. Remaining</th><th>Alerts</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }
+
+    return renderCombinedSection('Bi-Weekly Items', combined.biweekly, BIWEEKLY_CATS) +
+           renderCombinedSection('Monthly Items',   combined.monthly,  MONTHLY_CATS);
+  }
+
+  // ── Pull history ────────────────────────────────────────────────────────────
+  let activePullFilter = '';
+  function filterPulls(fac) {
+    activePullFilter = fac;
+    document.querySelectorAll('.pull-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.trim() === (fac || 'All'));
+    });
+    renderPulls(fac);
+  }
+
+  function renderPulls(fac) {
+    const pulls = fac ? allPulls.filter(p => p.facility === fac) : allPulls;
+    const el = document.getElementById('pull-history-body');
+
+    if (!pulls.length) {
+      el.innerHTML = '<div class="empty-state">No pulls recorded.</div>';
+      return;
+    }
+
+    el.innerHTML = `
+      <table class="pull-table">
+        <thead><tr>
+          <th>Date</th>
+          <th>Facility</th>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Pulled By</th>
+        </tr></thead>
+        <tbody>
+          ${pulls.map(p => {
+            const label = itemLabel(p.category, p.item);
+            return `<tr>
+              <td style="white-space:nowrap">${formatDate(p.pulled_at)}</td>
+              <td><span class="fac-badge">${esc(p.facility)}</span></td>
+              <td>
+                ${esc(label)}
+                ${p.notes ? `<div class="pull-notes">${esc(p.notes)}</div>` : ''}
+              </td>
+              <td><span class="pull-qty">${p.quantity}</span></td>
+              <td>${esc(p.pulled_by)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function itemLabel(cat, item) {
+    return CATALOG[cat]?.items?.[item] || item;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+           ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
 
   function esc(str) {
     return String(str ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  async function apiFetch(url) {
-    const sep = url.includes('?') ? '&' : '?';
-    return fetch(url + sep + 'key=' + encodeURIComponent(ADMIN_KEY));
+  // ── Boot ─────────────────────────────────────────────────────────────────────
+  if (ADMIN_KEY) {
+    init();
+  } else {
+    document.getElementById('key-prompt').style.display = 'block';
   }
-
-  async function loadWeeks() {
-    const res = await apiFetch('/api/weeks');
-    if (res.status === 401) { document.body.innerHTML = '<p style="padding:40px;color:red">Unauthorized. Add ?key=YOUR_KEY to the URL.</p>'; return; }
-    const weeks = await res.json();
-    const sel = document.getElementById('filter-week');
-    weeks.forEach(w => {
-      const opt = document.createElement('option');
-      opt.value = w;
-      opt.textContent = 'Week of ' + new Date(w + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      sel.appendChild(opt);
-    });
-    // Default to current week
-    if (weeks.length) sel.value = weeks[0];
-  }
-
-  async function load() {
-    const week     = document.getElementById('filter-week').value;
-    const facility = document.getElementById('filter-facility').value;
-    const params   = new URLSearchParams();
-    if (week)     params.set('week', week);
-    if (facility) params.set('facility', facility);
-
-    const res  = await apiFetch('/api/submissions?' + params);
-    const data = await res.json();
-
-    renderStats(data);
-    renderSubmissions(data);
-  }
-
-  function renderStats(data) {
-    const total = data.length;
-    const bathOk = data.filter(d => d.bathrooms_clean).length;
-    const windOk = data.filter(d => d.windscreens_up).length;
-    document.getElementById('stats').innerHTML = `
-      <div class="stat-card"><div class="num">${total}</div><div class="lbl">Submissions</div></div>
-      <div class="stat-card"><div class="num">${bathOk}/${total}</div><div class="lbl">Bathrooms ✅</div></div>
-      <div class="stat-card"><div class="num">${windOk}/${total}</div><div class="lbl">Windscreens ✅</div></div>
-    `;
-  }
-
-  function renderSubmissions(data) {
-    const el = document.getElementById('submissions');
-    if (!data.length) { el.innerHTML = '<div class="empty">No submissions found.</div>'; return; }
-
-    el.innerHTML = data.map(s => {
-      const date = new Date(s.submitted_at).toLocaleString('en-US', {
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-      });
-
-      const invRows = Object.entries(s.inventory)
-        .filter(([,v]) => v > 0)
-        .map(([k,v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
-        .join('');
-
-      return `
-        <div class="submission-card">
-          <div class="submission-header">
-            <div>
-              <div class="facility">${esc(s.facility)}</div>
-              <div class="meta">Submitted by ${esc(s.submitted_by)} · ${date}</div>
-            </div>
-          </div>
-          <div class="submission-body">
-            <div>
-              <div class="section-title">Maintenance</div>
-              <div class="check-row">
-                <span class="icon">${s.bathrooms_clean ? '✅' : '❌'}</span>
-                <div>Bathrooms clean</div>
-              </div>
-              <div class="check-row">
-                <span class="icon">${s.windscreens_up ? '✅' : '❌'}</span>
-                <div>
-                  Windscreens up
-                  ${!s.windscreens_up && s.windscreen_courts ? `<div class="note">Courts: ${esc(s.windscreen_courts)}</div>` : ''}
-                </div>
-              </div>
-            </div>
-            <div>
-              <div class="section-title">Inventory</div>
-              ${invRows
-                ? `<table class="inv">${invRows}</table>`
-                : '<span style="color:#aaa;font-size:13px">No counts entered</span>'}
-            </div>
-            ${s.notes ? `<div class="notes-box"><strong>Notes:</strong> ${esc(s.notes)}</div>` : ''}
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  loadWeeks().then(load);
 </script>
 </body>
 </html>

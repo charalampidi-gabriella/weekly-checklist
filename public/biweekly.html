@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Bi-Weekly Count</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f1;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+    header {
+      background: #2c7a3e;
+      color: #fff;
+      padding: 16px 16px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .back-btn {
+      color: rgba(255,255,255,.85);
+      text-decoration: none;
+      font-size: 22px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    header .header-text h1 { font-size: 20px; font-weight: 700; }
+    header .header-text p  { font-size: 13px; opacity: .8; margin-top: 2px; }
+
+    main { max-width: 520px; margin: 0 auto; padding: 16px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2c7a3e;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e8f0ea;
+    }
+
+    /* Facility buttons */
+    .facility-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .facility-btn {
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      padding: 14px 6px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #fff;
+      color: #555;
+      transition: all .15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .facility-btn.selected {
+      border-color: #2c7a3e;
+      background: #2c7a3e;
+      color: #fff;
+    }
+
+    /* Inventory rows */
+    .sub-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: 10px 0 6px;
+    }
+    .sub-label:first-child { padding-top: 0; }
+
+    .inventory-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .inventory-row:last-child { border-bottom: none; }
+    .inventory-row .inv-label {
+      font-size: 15px;
+      flex: 1;
+      padding-right: 12px;
+    }
+
+    .count-control {
+      display: flex;
+      align-items: center;
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .count-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: #f5f5f5;
+      font-size: 20px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      flex-shrink: 0;
+    }
+    .count-btn:active { background: #e0e0e0; }
+    .count-display {
+      width: 52px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      border: none;
+      background: #fff;
+      padding: 0 4px;
+      -moz-appearance: textfield;
+    }
+    .count-display::-webkit-outer-spin-button,
+    .count-display::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    input[type="text"] {
+      width: 100%;
+      border: 2px solid #d0d0d0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+      background: #fff;
+    }
+    input[type="text"]:focus { border-color: #2c7a3e; }
+
+    .submit-btn {
+      width: 100%;
+      background: #2c7a3e;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 18px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+      -webkit-tap-highlight-color: transparent;
+      margin-bottom: 32px;
+    }
+    .submit-btn:active { background: #235f30; }
+    .submit-btn:disabled { background: #a0c4a8; cursor: not-allowed; }
+
+    .error-msg {
+      color: #c0392b;
+      font-size: 13px;
+      margin-top: 6px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    #success-screen {
+      display: none;
+      text-align: center;
+      padding: 70px 20px;
+    }
+    #success-screen .checkmark { font-size: 72px; margin-bottom: 16px; }
+    #success-screen h2 { font-size: 24px; margin-bottom: 8px; }
+    #success-screen p  { color: #666; margin-bottom: 24px; }
+    #success-screen .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    #success-screen button {
+      border: none;
+      border-radius: 10px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-again { background: #2c7a3e; color: #fff; }
+    .btn-home  { background: #e8f0ea; color: #2c7a3e; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="back-btn" href="index.html">‹</a>
+  <div class="header-text">
+    <h1>Bi-Weekly Count</h1>
+    <p>String reels &amp; ball cases</p>
+  </div>
+</header>
+
+<div id="form-area">
+<main>
+
+  <!-- FACILITY -->
+  <div class="card">
+    <h2>Facility</h2>
+    <div class="facility-grid">
+      <div class="facility-btn" data-facility="SATC">SATC</div>
+      <div class="facility-btn" data-facility="Pharr">Pharr</div>
+      <div class="facility-btn" data-facility="Wilco">Wilco</div>
+    </div>
+    <div class="error-msg" id="err-facility">Please select a facility.</div>
+  </div>
+
+  <!-- STRING REELS -->
+  <div class="card">
+    <h2>String Reels</h2>
+
+    <div class="inventory-row">
+      <span class="inv-label">Hawk Touch</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="hawk_touch">−</button>
+        <input class="count-display" type="number" id="hawk_touch" data-category="reels" data-item="hawk_touch" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="hawk_touch">+</button>
+      </div>
+    </div>
+
+    <div class="inventory-row">
+      <span class="inv-label">Hawk Tour RPET</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="hawk_tour_rpet">−</button>
+        <input class="count-display" type="number" id="hawk_tour_rpet" data-category="reels" data-item="hawk_tour_rpet" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="hawk_tour_rpet">+</button>
+      </div>
+    </div>
+
+    <div class="inventory-row">
+      <span class="inv-label">Lynx Tour</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="lynx_tour">−</button>
+        <input class="count-display" type="number" id="lynx_tour" data-category="reels" data-item="lynx_tour" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="lynx_tour">+</button>
+      </div>
+    </div>
+
+    <div class="inventory-row">
+      <span class="inv-label">Lynx Touch</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="lynx_touch">−</button>
+        <input class="count-display" type="number" id="lynx_touch" data-category="reels" data-item="lynx_touch" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="lynx_touch">+</button>
+      </div>
+    </div>
+
+    <div class="inventory-row">
+      <span class="inv-label">Velocity MLT</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="velocity_mlt">−</button>
+        <input class="count-display" type="number" id="velocity_mlt" data-category="reels" data-item="velocity_mlt" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="velocity_mlt">+</button>
+      </div>
+    </div>
+
+    <div class="inventory-row">
+      <span class="inv-label">RPM Blast</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="rpm_blast">−</button>
+        <input class="count-display" type="number" id="rpm_blast" data-category="reels" data-item="rpm_blast" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="rpm_blast">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BALL CASES -->
+  <div class="card">
+    <h2>Ball Cases</h2>
+
+    <div class="inventory-row">
+      <span class="inv-label">Full Cases</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="full_cases">−</button>
+        <input class="count-display" type="number" id="full_cases" data-category="ball_cases" data-item="full_cases" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="full_cases">+</button>
+      </div>
+    </div>
+
+    <div class="inventory-row">
+      <span class="inv-label">Open Cans (partial cases)</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="open_cans">−</button>
+        <input class="count-display" type="number" id="open_cans" data-category="ball_cases" data-item="open_cans" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="open_cans">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAME -->
+  <div class="card">
+    <h2>Your Name</h2>
+    <input type="text" id="submitted_by" placeholder="Enter your name" autocomplete="name">
+    <div class="error-msg" id="err-name">Please enter your name.</div>
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="submitForm()">Submit Bi-Weekly Count</button>
+
+</main>
+</div>
+
+<!-- SUCCESS -->
+<div id="success-screen">
+  <div class="checkmark">✅</div>
+  <h2>Count Submitted!</h2>
+  <p>The bi-weekly count has been recorded.</p>
+  <div class="btn-row">
+    <button class="btn-again" onclick="location.reload()">Submit Another</button>
+    <button class="btn-home" onclick="location.href='index.html'">Home</button>
+  </div>
+</div>
+
+<script>
+  let selectedFacility = null;
+
+  // Facility buttons
+  document.querySelectorAll('.facility-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.facility-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedFacility = btn.dataset.facility;
+      hide('err-facility');
+    });
+  });
+
+  // Count controls
+  document.querySelectorAll('.count-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.target);
+      const val = parseInt(input.value) || 0;
+      if (btn.dataset.action === 'inc') input.value = val + 1;
+      if (btn.dataset.action === 'dec') input.value = Math.max(0, val - 1);
+    });
+  });
+
+  function show(id) { document.getElementById(id).classList.add('visible'); }
+  function hide(id) { document.getElementById(id).classList.remove('visible'); }
+
+  function collectItems() {
+    const items = {};
+    document.querySelectorAll('.count-display[data-category]').forEach(input => {
+      const cat = input.dataset.category;
+      const itm = input.dataset.item;
+      if (!items[cat]) items[cat] = {};
+      items[cat][itm] = parseInt(input.value) || 0;
+    });
+    return items;
+  }
+
+  async function submitForm() {
+    let valid = true;
+
+    if (!selectedFacility) { show('err-facility'); valid = false; }
+
+    const name = document.getElementById('submitted_by').value.trim();
+    if (!name) { show('err-name'); valid = false; }
+
+    if (!valid) return;
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    try {
+      const res = await fetch('/api/count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility: selectedFacility,
+          count_type: 'biweekly',
+          submitted_by: name,
+          items: collectItems()
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Server error');
+      }
+      document.getElementById('form-area').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'block';
+      window.scrollTo(0, 0);
+    } catch (e) {
+      alert('Error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Submit Bi-Weekly Count';
+    }
+  }
+</script>
+</body>
+</html>
