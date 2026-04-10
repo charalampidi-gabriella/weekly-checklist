@@ -526,8 +526,12 @@
   function renderSection(title, state, categories) {
     let header = '';
     if (state) {
-      const d = formatDate(state.last_count.date);
-      header = `Last counted: <strong>${d}</strong> by <strong>${esc(state.last_count.submitted_by)}</strong>`;
+      if (state.last_count) {
+        const d = formatDate(state.last_count.date);
+        header = `Last counted: <strong>${d}</strong> by <strong>${esc(state.last_count.submitted_by)}</strong>`;
+      } else {
+        header = `<em style="color:#d97706">No count submitted yet — showing transfers received</em>`;
+      }
     }
 
     let rows = '';

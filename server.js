@@ -177,7 +177,42 @@ async function getInventoryState(facility) {
   const state = {};
 
   for (const [type, rows] of [['biweekly', bwRows.rows], ['monthly', moRows.rows]]) {
-    if (rows.length === 0) { state[type] = null; continue; }
+    const categories = type === 'biweekly'
+      ? ['reels', 'ball_cases']
+      : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
+    const catPlaceholders = categories.map(() => '?').join(',');
+
+    // No count yet — still show any transfers received so far
+    if (rows.length === 0) {
+      const trInOnly = await db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_transfers
+              WHERE to_facility = ? AND category IN (${catPlaceholders})
+              GROUP BY category, item`,
+        args: [facility, ...categories]
+      });
+      if (trInOnly.rows.length === 0) {
+        state[type] = null;
+      } else {
+        const transfersIn = {};
+        const estimated  = {};
+        for (const row of trInOnly.rows) {
+          if (!transfersIn[row.category]) transfersIn[row.category] = {};
+          if (!estimated[row.category])   estimated[row.category]   = {};
+          transfersIn[row.category][row.item] = Number(row.total);
+          estimated[row.category][row.item]   = Number(row.total);
+        }
+        const alerts = [];
+        for (const [cat, thresholds] of Object.entries(ALERT_THRESHOLDS)) {
+          if (!estimated[cat]) continue;
+          for (const [itm, threshold] of Object.entries(thresholds)) {
+            if (estimated[cat][itm] !== undefined && estimated[cat][itm] <= threshold)
+              alerts.push({ category: cat, item: itm, threshold, current: estimated[cat][itm] });
+          }
+        }
+        state[type] = { last_count: null, pulls_since: {}, transfers_out: {}, transfers_in: transfersIn, estimated, alerts };
+      }
+      continue;
+    }
 
     const count = rows[0];
     let items;
@@ -189,11 +224,6 @@ async function getInventoryState(facility) {
       continue;
     }
 
-    const categories = type === 'biweekly'
-      ? ['reels', 'ball_cases']
-      : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
-
-    const catPlaceholders = categories.map(() => '?').join(',');
     const [pullRows, trOutRows, trInRows] = await Promise.all([
       db.execute({
         sql: `SELECT category, item, SUM(quantity) as total FROM inventory_pulls
@@ -248,8 +278,8 @@ async function getInventoryState(facility) {
     }
     for (const [cat, subItems] of Object.entries(transfersIn)) {
       for (const [itm, qty] of Object.entries(subItems)) {
-        if (estimated[cat]?.[itm] !== undefined)
-          estimated[cat][itm] = estimated[cat][itm] + qty;
+        if (!estimated[cat]) estimated[cat] = {};
+        estimated[cat][itm] = (estimated[cat][itm] ?? 0) + qty;
       }
     }
 
