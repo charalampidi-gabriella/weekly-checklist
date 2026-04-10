@@ -180,7 +180,14 @@ async function getInventoryState(facility) {
     if (rows.length === 0) { state[type] = null; continue; }
 
     const count = rows[0];
-    const items = JSON.parse(count.items);
+    let items;
+    try {
+      items = JSON.parse(count.items);
+    } catch (e) {
+      console.error(`Malformed items JSON in inventory_counts id=${count.id}:`, e.message);
+      state[type] = null;
+      continue;
+    }
 
     const categories = type === 'biweekly'
       ? ['reels', 'ball_cases']

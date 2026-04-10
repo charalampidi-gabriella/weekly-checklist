@@ -404,16 +404,34 @@
   const BIWEEKLY_CATS  = ['reels', 'ball_cases'];
   const MONTHLY_CATS   = ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
 
-  let ADMIN_KEY = new URLSearchParams(location.search).get('key') || '';
+  // Load key from sessionStorage; if it was in the URL, save it and strip it
+  let ADMIN_KEY = sessionStorage.getItem('adminKey') || '';
+  const _urlKey = new URLSearchParams(location.search).get('key');
+  if (_urlKey) {
+    ADMIN_KEY = _urlKey;
+    sessionStorage.setItem('adminKey', _urlKey);
+    const _clean = new URL(location.href);
+    _clean.searchParams.delete('key');
+    history.replaceState(null, '', _clean.toString());
+  }
+
   let inventoryData = null;
   let allPulls = [];
   let allTransfers = [];
   let currentTab = 'SATC';
 
+  function apiFetch(url) {
+    return fetch(url, { headers: { 'x-admin-key': ADMIN_KEY } });
+  }
+
   // ── Auth ────────────────────────────────────────────────────────────────────
   function enterKey() {
     const k = document.getElementById('key-input').value.trim();
-    if (k) { ADMIN_KEY = k; init(); }
+    if (k) {
+      ADMIN_KEY = k;
+      sessionStorage.setItem('adminKey', k);
+      init();
+    }
   }
 
   async function init() {
@@ -422,9 +440,9 @@
 
     try {
       const [invRes, pullRes, transRes] = await Promise.all([
-        fetch('/api/inventory?key='  + encodeURIComponent(ADMIN_KEY)),
-        fetch('/api/pulls?key='      + encodeURIComponent(ADMIN_KEY)),
-        fetch('/api/transfers?key='  + encodeURIComponent(ADMIN_KEY)),
+        apiFetch('/api/inventory'),
+        apiFetch('/api/pulls'),
+        apiFetch('/api/transfers'),
       ]);
 
       if (invRes.status === 401) {
