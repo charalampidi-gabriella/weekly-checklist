@@ -178,7 +178,7 @@ async function getInventoryState(facility) {
 
   for (const [type, rows] of [['biweekly', bwRows.rows], ['monthly', moRows.rows]]) {
     const categories = type === 'biweekly'
-      ? ['reels', 'ball_cases']
+      ? ['reels', 'ball_cases', 'concessions']
       : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
     const catPlaceholders = categories.map(() => '?').join(',');
 
