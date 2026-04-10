@@ -534,7 +534,7 @@
       const catDef = CATALOG[cat];
       if (!catDef) continue;
 
-      rows += `<tr class="cat-header"><td colspan="6">${catDef.label}</td></tr>`;
+      rows += `<tr class="cat-header"><td colspan="5">${catDef.label}</td></tr>`;
 
       for (const [itemKey, itemName] of Object.entries(catDef.items)) {
         const counted  = state?.last_count?.items?.[cat]?.[itemKey];
@@ -563,13 +563,12 @@
           statusHtml = '<span class="status-badge status-ok">OK</span>';
         }
 
-        rows += `<tr${rowClass}>
+        rows += `<tr>
           <td>${esc(itemName)}</td>
           <td>${countedStr}</td>
           <td>${outStr}</td>
           <td>${inStr}</td>
           <td>${estStr}</td>
-          <td>${statusHtml}</td>
         </tr>`;
       }
     }
@@ -588,7 +587,6 @@
                 <th>Out Since</th>
                 <th>In Since</th>
                 <th>Est. Remaining</th>
-                <th>Status</th>
               </tr></thead>
               <tbody>${rows}</tbody>
              </table>`
