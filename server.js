@@ -283,23 +283,13 @@ async function getInventoryState(facility) {
       }
     }
 
-    const alerts = [];
-    for (const [cat, thresholds] of Object.entries(ALERT_THRESHOLDS)) {
-      if (!estimated[cat]) continue;
-      for (const [itm, threshold] of Object.entries(thresholds)) {
-        if (estimated[cat][itm] !== undefined && estimated[cat][itm] <= threshold) {
-          alerts.push({ category: cat, item: itm, threshold, current: estimated[cat][itm] });
-        }
-      }
-    }
-
     state[type] = {
       last_count: { date: count.submitted_at, submitted_by: count.submitted_by, items },
       pulls_since: pullsSince,
       transfers_out: transfersOut,
       transfers_in: transfersIn,
       estimated,
-      alerts
+      alerts: []  // alerts are computed on combined totals only
     };
   }
 
@@ -318,7 +308,6 @@ app.get('/api/inventory', requireAdmin, async (req, res) => {
     const combined = { biweekly: null, monthly: null };
     for (const type of ['biweekly', 'monthly']) {
       const totalEst = {};
-      const allAlerts = [];
       let hasData = false;
 
       for (const fac of VALID_FACILITIES) {
@@ -331,10 +320,20 @@ app.get('/api/inventory', requireAdmin, async (req, res) => {
             totalEst[cat][itm] = (totalEst[cat][itm] || 0) + qty;
           }
         }
-        allAlerts.push(...s.alerts.map(a => ({ ...a, facility: fac })));
       }
 
-      if (hasData) combined[type] = { estimated: totalEst, alerts: allAlerts };
+      if (hasData) {
+        // Alerts fire on combined totals across all facilities
+        const combinedAlerts = [];
+        for (const [cat, thresholds] of Object.entries(ALERT_THRESHOLDS)) {
+          if (!totalEst[cat]) continue;
+          for (const [itm, threshold] of Object.entries(thresholds)) {
+            if (totalEst[cat][itm] !== undefined && totalEst[cat][itm] <= threshold)
+              combinedAlerts.push({ category: cat, item: itm, threshold, current: totalEst[cat][itm] });
+          }
+        }
+        combined[type] = { estimated: totalEst, alerts: combinedAlerts };
+      }
     }
     result.combined = combined;
 

@@ -467,15 +467,13 @@
   // ── Alerts banner ───────────────────────────────────────────────────────────
   function renderAlerts() {
     const chips = [];
-    for (const fac of ['SATC', 'Pharr', 'Wilco']) {
-      const d = inventoryData[fac];
-      for (const type of ['biweekly', 'monthly']) {
-        if (d[type]?.alerts?.length) {
-          d[type].alerts.forEach(a => {
-            const label = itemLabel(a.category, a.item);
-            chips.push(`<div class="alert-chip">${fac}: ${label} — ${a.current} left (order at ≤${a.threshold})</div>`);
-          });
-        }
+    for (const type of ['biweekly', 'monthly']) {
+      const comb = inventoryData.combined?.[type];
+      if (comb?.alerts?.length) {
+        comb.alerts.forEach(a => {
+          const label = itemLabel(a.category, a.item);
+          chips.push(`<div class="alert-chip">${label} — ${a.current} total across all locations (order at ≤${a.threshold})</div>`);
+        });
       }
     }
 
@@ -484,20 +482,17 @@
       document.getElementById('alert-chips').innerHTML = chips.join('');
     }
 
-    // Add alert dots to tabs
-    const facAlerts = { SATC: false, Pharr: false, Wilco: false };
-    for (const fac of ['SATC', 'Pharr', 'Wilco']) {
-      const d = inventoryData[fac];
-      if (d.biweekly?.alerts?.length || d.monthly?.alerts?.length) facAlerts[fac] = true;
-    }
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      const fac = btn.textContent.trim();
-      if (facAlerts[fac]) {
-        if (!btn.querySelector('.alert-dot')) {
+    // Alert dot only on "All Facilities" tab
+    const hasCombinedAlerts =
+      inventoryData.combined?.biweekly?.alerts?.length > 0 ||
+      inventoryData.combined?.monthly?.alerts?.length  > 0;
+    if (hasCombinedAlerts) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.textContent.trim().startsWith('All') && !btn.querySelector('.alert-dot')) {
           btn.appendChild(Object.assign(document.createElement('span'), { className: 'alert-dot' }));
         }
-      }
-    });
+      });
+    }
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────────────
@@ -617,14 +612,14 @@
         rows += `<tr class="cat-header"><td colspan="3">${catDef.label}</td></tr>`;
         for (const [itemKey, itemName] of Object.entries(catDef.items)) {
           const est = state?.estimated?.[cat]?.[itemKey];
-          const perFacAlerts = (state?.alerts || []).filter(a => a.category === cat && a.item === itemKey);
-          const isAlert = perFacAlerts.length > 0;
+          const alertEntry = (state?.alerts || []).find(a => a.category === cat && a.item === itemKey);
+          const isAlert = !!alertEntry;
           const rowClass = isAlert ? ' class="alert-row"' : '';
           const estStr = est !== undefined
             ? `<span class="est-num ${isAlert ? 'est-low' : ''}">${est}</span>`
             : '<span style="color:#ccc">—</span>';
           const alertsStr = isAlert
-            ? perFacAlerts.map(a => `<span class="alert-chip" style="font-size:11px;padding:2px 8px">${a.facility}: ${a.current} left</span>`).join(' ')
+            ? `<span class="status-badge status-low">LOW — ${alertEntry.current} total (order at ≤${alertEntry.threshold})</span>`
             : '<span class="status-badge status-ok">OK</span>';
 
           rows += `<tr${rowClass}>
