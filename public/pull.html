@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Log Inventory Pull</title>
+  <title>Log Pull / Transfer</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -20,17 +20,38 @@
       align-items: center;
       gap: 12px;
     }
-    .back-btn {
-      color: rgba(255,255,255,.85);
-      text-decoration: none;
-      font-size: 22px;
-      line-height: 1;
-      flex-shrink: 0;
-    }
+    .back-btn { color: rgba(255,255,255,.85); text-decoration: none; font-size: 22px; line-height: 1; flex-shrink: 0; }
     header .header-text h1 { font-size: 20px; font-weight: 700; }
     header .header-text p  { font-size: 13px; opacity: .8; margin-top: 2px; }
 
     main { max-width: 520px; margin: 0 auto; padding: 16px; }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      background: #fff;
+      border-radius: 12px;
+      padding: 6px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .mode-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      background: none;
+      color: #777;
+      transition: all .15s;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mode-btn.active { background: #2c7a3e; color: #fff; }
+    .mode-btn.active.transfer { background: #1e40af; }
 
     .card {
       background: #fff;
@@ -49,6 +70,7 @@
       padding-bottom: 8px;
       border-bottom: 2px solid #e8f0ea;
     }
+    .card h2.blue { color: #1e40af; border-bottom-color: #dbeafe; }
 
     .facility-grid {
       display: grid;
@@ -69,11 +91,9 @@
       -webkit-tap-highlight-color: transparent;
       user-select: none;
     }
-    .facility-btn.selected {
-      border-color: #2c7a3e;
-      background: #2c7a3e;
-      color: #fff;
-    }
+    .facility-btn.selected        { border-color: #2c7a3e; background: #2c7a3e; color: #fff; }
+    .facility-btn.selected-to     { border-color: #1e40af; background: #1e40af; color: #fff; }
+    .facility-btn.disabled-option { opacity: .35; pointer-events: none; }
 
     .field-label {
       font-size: 14px;
@@ -81,7 +101,6 @@
       color: #555;
       margin-bottom: 8px;
     }
-    .field-label + .field-label { margin-top: 14px; }
 
     select, input[type="text"], textarea {
       width: 100%;
@@ -109,11 +128,9 @@
 
     .spacer { height: 14px; }
 
-    /* Quantity control */
     .qty-row {
       display: flex;
       align-items: center;
-      gap: 0;
       border: 2px solid #d0d0d0;
       border-radius: 10px;
       overflow: hidden;
@@ -149,8 +166,6 @@
 
     .submit-btn {
       width: 100%;
-      background: #c0392b;
-      color: #fff;
       border: none;
       border-radius: 12px;
       padding: 18px;
@@ -161,16 +176,24 @@
       -webkit-tap-highlight-color: transparent;
       margin-bottom: 32px;
     }
-    .submit-btn:active { background: #a93226; }
-    .submit-btn:disabled { background: #e8a09a; cursor: not-allowed; }
+    .submit-btn.pull     { background: #c0392b; color: #fff; }
+    .submit-btn.pull:active     { background: #a93226; }
+    .submit-btn.transfer { background: #1e40af; color: #fff; }
+    .submit-btn.transfer:active { background: #1e3a8a; }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-    .error-msg {
-      color: #c0392b;
-      font-size: 13px;
-      margin-top: 6px;
+    .error-msg { color: #c0392b; font-size: 13px; margin-top: 6px; display: none; }
+    .error-msg.visible { display: block; }
+
+    .summary-box {
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 15px;
+      margin-bottom: 14px;
       display: none;
     }
-    .error-msg.visible { display: block; }
+    .summary-box.pull     { background: #fdf2f1; border: 1px solid #f5c6c2; }
+    .summary-box.transfer { background: #eff6ff; border: 1px solid #bfdbfe; }
 
     #success-screen {
       display: none;
@@ -181,27 +204,9 @@
     #success-screen h2 { font-size: 24px; margin-bottom: 8px; }
     #success-screen p  { color: #666; margin-bottom: 24px; }
     #success-screen .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    #success-screen button {
-      border: none;
-      border-radius: 10px;
-      padding: 14px 28px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn-again { background: #c0392b; color: #fff; }
+    #success-screen button { border: none; border-radius: 10px; padding: 14px 28px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .btn-again { background: #2c7a3e; color: #fff; }
     .btn-home  { background: #e8f0ea; color: #2c7a3e; }
-
-    .summary-box {
-      background: #fdf2f1;
-      border: 1px solid #f5c6c2;
-      border-radius: 10px;
-      padding: 14px 16px;
-      font-size: 15px;
-      margin-bottom: 14px;
-      display: none;
-    }
-    .summary-box strong { font-weight: 700; }
   </style>
 </head>
 <body>
@@ -209,29 +214,58 @@
 <header>
   <a class="back-btn" href="index.html">‹</a>
   <div class="header-text">
-    <h1>Log Inventory Pull</h1>
-    <p>Record items taken from stock</p>
+    <h1>Log Pull / Transfer</h1>
+    <p>Record a stock pull or inter-facility transfer</p>
   </div>
 </header>
 
 <div id="form-area">
 <main>
 
-  <!-- FACILITY -->
-  <div class="card">
-    <h2>Facility</h2>
-    <div class="facility-grid">
-      <div class="facility-btn" data-facility="SATC">SATC</div>
-      <div class="facility-btn" data-facility="Pharr">Pharr</div>
-      <div class="facility-btn" data-facility="Wilco">Wilco</div>
-    </div>
-    <div class="error-msg" id="err-facility">Please select a facility.</div>
+  <!-- MODE TOGGLE -->
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="btn-mode-pull" onclick="setMode('pull')">Stock Pull</button>
+    <button class="mode-btn transfer" id="btn-mode-transfer" onclick="setMode('transfer')">Transfer Between Facilities</button>
   </div>
 
-  <!-- ITEM -->
+  <!-- PULL: single facility -->
+  <div id="pull-facility-section">
+    <div class="card">
+      <h2>Facility</h2>
+      <div class="facility-grid" id="pull-facility-grid">
+        <div class="facility-btn" data-group="pull" data-facility="SATC">SATC</div>
+        <div class="facility-btn" data-group="pull" data-facility="Pharr">Pharr</div>
+        <div class="facility-btn" data-group="pull" data-facility="Wilco">Wilco</div>
+      </div>
+      <div class="error-msg" id="err-pull-facility">Please select a facility.</div>
+    </div>
+  </div>
+
+  <!-- TRANSFER: from + to -->
+  <div id="transfer-facility-section" style="display:none">
+    <div class="card">
+      <h2 class="blue">From Facility</h2>
+      <div class="facility-grid">
+        <div class="facility-btn" data-group="from" data-facility="SATC">SATC</div>
+        <div class="facility-btn" data-group="from" data-facility="Pharr">Pharr</div>
+        <div class="facility-btn" data-group="from" data-facility="Wilco">Wilco</div>
+      </div>
+      <div class="error-msg" id="err-from-facility">Please select the source facility.</div>
+    </div>
+    <div class="card">
+      <h2 class="blue">To Facility</h2>
+      <div class="facility-grid">
+        <div class="facility-btn" data-group="to" data-facility="SATC">SATC</div>
+        <div class="facility-btn" data-group="to" data-facility="Pharr">Pharr</div>
+        <div class="facility-btn" data-group="to" data-facility="Wilco">Wilco</div>
+      </div>
+      <div class="error-msg" id="err-to-facility">Please select the destination facility.</div>
+    </div>
+  </div>
+
+  <!-- ITEM (shared) -->
   <div class="card">
     <h2>Item</h2>
-
     <div class="field-label">Category</div>
     <select id="category-select" onchange="onCategoryChange()">
       <option value="">Select a category...</option>
@@ -243,19 +277,17 @@
       <option value="headbands">Headbands</option>
       <option value="rackets">Rackets</option>
     </select>
-
     <div class="spacer"></div>
     <div class="field-label">Item</div>
     <select id="item-select" disabled>
       <option value="">Select a category first...</option>
     </select>
-
     <div class="error-msg" id="err-item">Please select a category and item.</div>
   </div>
 
-  <!-- QUANTITY -->
+  <!-- QUANTITY (shared) -->
   <div class="card">
-    <h2>Quantity Pulled</h2>
+    <h2>Quantity</h2>
     <div class="qty-row">
       <button type="button" class="qty-btn" id="qty-dec">−</button>
       <input class="qty-display" type="number" id="quantity" value="1" min="1">
@@ -264,30 +296,29 @@
     <div class="error-msg" id="err-qty">Quantity must be at least 1.</div>
   </div>
 
-  <!-- NAME & NOTES -->
+  <!-- DETAILS (shared) -->
   <div class="card">
     <h2>Details</h2>
     <div class="field-label">Your Name</div>
-    <input type="text" id="pulled_by" placeholder="Enter your name" autocomplete="name">
+    <input type="text" id="submitted_by" placeholder="Enter your name" autocomplete="name">
     <div class="error-msg" id="err-name">Please enter your name.</div>
-
     <div class="spacer"></div>
     <div class="field-label">Notes (optional)</div>
-    <textarea id="notes" placeholder="e.g. Used for stringing on court 4..."></textarea>
+    <textarea id="notes" placeholder="Any relevant notes..."></textarea>
   </div>
 
-  <div class="summary-box" id="summary-box"></div>
+  <div class="summary-box pull" id="summary-box"></div>
 
-  <button class="submit-btn" id="submit-btn" onclick="submitForm()">Log Pull</button>
+  <button class="submit-btn pull" id="submit-btn" onclick="submitForm()">Log Pull</button>
 
 </main>
 </div>
 
 <!-- SUCCESS -->
 <div id="success-screen">
-  <div class="checkmark">📦</div>
-  <h2>Pull Logged!</h2>
-  <p id="success-detail">The inventory pull has been recorded.</p>
+  <div class="checkmark" id="success-icon">📦</div>
+  <h2 id="success-title">Logged!</h2>
+  <p id="success-detail"></p>
   <div class="btn-row">
     <button class="btn-again" onclick="location.reload()">Log Another</button>
     <button class="btn-home" onclick="location.href='index.html'">Home</button>
@@ -297,83 +328,108 @@
 <script>
   const ITEMS_BY_CATEGORY = {
     reels: [
-      { key: 'hawk_touch',    label: 'Hawk Touch' },
+      { key: 'hawk_touch',     label: 'Hawk Touch' },
       { key: 'hawk_tour_rpet', label: 'Hawk Tour RPET' },
-      { key: 'lynx_tour',     label: 'Lynx Tour' },
-      { key: 'lynx_touch',    label: 'Lynx Touch' },
-      { key: 'velocity_mlt',  label: 'Velocity MLT' },
-      { key: 'rpm_blast',     label: 'RPM Blast' },
+      { key: 'lynx_tour',      label: 'Lynx Tour' },
+      { key: 'lynx_touch',     label: 'Lynx Touch' },
+      { key: 'velocity_mlt',   label: 'Velocity MLT' },
+      { key: 'rpm_blast',      label: 'RPM Blast' },
     ],
-    ball_cases: [
-      { key: 'full_cases', label: 'Full Cases' },
-      { key: 'open_cans',  label: 'Open Cans' },
-    ],
-    prime_tour_grips: [
-      { key: 'white', label: 'White' },
-      { key: 'black', label: 'Black' },
-      { key: 'pink',  label: 'Pink' },
-      { key: 'blue',  label: 'Blue' },
-    ],
-    pro_grips: [
-      { key: 'total', label: 'Pro Grips (total)' },
-    ],
-    wristbands: [
-      { key: '2_5in_black', label: '2.5in Black' },
-      { key: '2_5in_white', label: '2.5in White' },
-      { key: '5in_black',   label: '5in Black' },
-      { key: '5in_white',   label: '5in White' },
-    ],
-    headbands: [
-      { key: 'black', label: 'Black' },
-      { key: 'white', label: 'White' },
-    ],
+    ball_cases:       [{ key: 'full_cases', label: 'Full Cases' }, { key: 'open_cans', label: 'Open Cans' }],
+    prime_tour_grips: [{ key: 'white', label: 'White' }, { key: 'black', label: 'Black' }, { key: 'pink', label: 'Pink' }, { key: 'blue', label: 'Blue' }],
+    pro_grips:        [{ key: 'total', label: 'Pro Grips (total)' }],
+    wristbands:       [{ key: '2_5in_black', label: '2.5in Black' }, { key: '2_5in_white', label: '2.5in White' }, { key: '5in_black', label: '5in Black' }, { key: '5in_white', label: '5in White' }],
+    headbands:        [{ key: 'black', label: 'Black' }, { key: 'white', label: 'White' }],
     rackets: [
-      { key: 'boom_2026',   label: 'Boom 2026' },
-      { key: 'speed_2026',  label: 'Speed 2026' },
-      { key: 'speed_legend', label: 'Speed Legend' },
-      { key: 'gravity',     label: 'Gravity' },
-      { key: 'radical',     label: 'Radical' },
-      { key: 'extreme',     label: 'Extreme' },
-      { key: 'boom_2024',   label: 'Boom 2024' },
-      { key: 'boom_neon',   label: 'Boom Neon' },
-      { key: 'boom_ashe',   label: 'Boom Ashe' },
+      { key: 'boom_2026', label: 'Boom 2026' }, { key: 'speed_2026', label: 'Speed 2026' },
+      { key: 'speed_legend', label: 'Speed Legend' }, { key: 'gravity', label: 'Gravity' },
+      { key: 'radical', label: 'Radical' }, { key: 'extreme', label: 'Extreme' },
+      { key: 'boom_2024', label: 'Boom 2024' }, { key: 'boom_neon', label: 'Boom Neon' },
+      { key: 'boom_ashe', label: 'Boom Ashe' },
     ],
   };
 
-  let selectedFacility = null;
+  let mode = 'pull';
+  let pullFacility = null;
+  let fromFacility = null;
+  let toFacility   = null;
 
-  document.querySelectorAll('.facility-btn').forEach(btn => {
+  // ── Mode toggle ─────────────────────────────────────────────────────────────
+  function setMode(m) {
+    mode = m;
+    document.getElementById('btn-mode-pull').classList.toggle('active', m === 'pull');
+    document.getElementById('btn-mode-transfer').classList.toggle('active', m === 'transfer');
+    document.getElementById('pull-facility-section').style.display     = m === 'pull'     ? '' : 'none';
+    document.getElementById('transfer-facility-section').style.display = m === 'transfer' ? '' : 'none';
+
+    const btn = document.getElementById('submit-btn');
+    btn.textContent = m === 'pull' ? 'Log Pull' : 'Log Transfer';
+    btn.className   = 'submit-btn ' + m;
+
+    const box = document.getElementById('summary-box');
+    box.className = 'summary-box ' + m;
+
+    updateSummary();
+  }
+
+  // ── Facility buttons ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.facility-btn[data-group="pull"]').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.facility-btn').forEach(b => b.classList.remove('selected'));
+      document.querySelectorAll('.facility-btn[data-group="pull"]').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      selectedFacility = btn.dataset.facility;
-      hide('err-facility');
+      pullFacility = btn.dataset.facility;
+      hide('err-pull-facility');
       updateSummary();
     });
   });
 
+  document.querySelectorAll('.facility-btn[data-group="from"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.facility-btn[data-group="from"]').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      fromFacility = btn.dataset.facility;
+      // Disable same facility in "to"
+      document.querySelectorAll('.facility-btn[data-group="to"]').forEach(b => {
+        b.classList.toggle('disabled-option', b.dataset.facility === fromFacility);
+        if (b.dataset.facility === fromFacility && toFacility === fromFacility) {
+          b.classList.remove('selected-to');
+          toFacility = null;
+        }
+      });
+      hide('err-from-facility');
+      updateSummary();
+    });
+  });
+
+  document.querySelectorAll('.facility-btn[data-group="to"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('disabled-option')) return;
+      document.querySelectorAll('.facility-btn[data-group="to"]').forEach(b => b.classList.remove('selected-to'));
+      btn.classList.add('selected-to');
+      toFacility = btn.dataset.facility;
+      hide('err-to-facility');
+      updateSummary();
+    });
+  });
+
+  // ── Item dropdowns ───────────────────────────────────────────────────────────
   function onCategoryChange() {
     const cat = document.getElementById('category-select').value;
     const itemSel = document.getElementById('item-select');
-
     if (!cat) {
       itemSel.disabled = true;
       itemSel.innerHTML = '<option value="">Select a category first...</option>';
     } else {
       itemSel.disabled = false;
-      const items = ITEMS_BY_CATEGORY[cat] || [];
       itemSel.innerHTML = '<option value="">Select an item...</option>' +
-        items.map(i => `<option value="${i.key}">${i.label}</option>`).join('');
+        (ITEMS_BY_CATEGORY[cat] || []).map(i => `<option value="${i.key}">${i.label}</option>`).join('');
     }
     hide('err-item');
     updateSummary();
   }
+  document.getElementById('item-select').addEventListener('change', () => { hide('err-item'); updateSummary(); });
 
-  document.getElementById('item-select').addEventListener('change', () => {
-    hide('err-item');
-    updateSummary();
-  });
-
+  // ── Quantity ─────────────────────────────────────────────────────────────────
   document.getElementById('qty-dec').addEventListener('click', () => {
     const inp = document.getElementById('quantity');
     inp.value = Math.max(1, (parseInt(inp.value) || 1) - 1);
@@ -386,71 +442,88 @@
   });
   document.getElementById('quantity').addEventListener('input', updateSummary);
 
+  // ── Summary preview ──────────────────────────────────────────────────────────
   function updateSummary() {
-    const cat = document.getElementById('category-select').value;
+    const cat     = document.getElementById('category-select').value;
     const itemSel = document.getElementById('item-select');
-    const qty = parseInt(document.getElementById('quantity').value) || 0;
-    const box = document.getElementById('summary-box');
+    const qty     = parseInt(document.getElementById('quantity').value) || 0;
+    const box     = document.getElementById('summary-box');
+    const itemLbl = itemSel.value ? (itemSel.options[itemSel.selectedIndex]?.text || itemSel.value) : null;
 
-    if (selectedFacility && cat && itemSel.value && qty > 0) {
-      const itemLabel = itemSel.options[itemSel.selectedIndex]?.text || itemSel.value;
-      const catLabel = document.getElementById('category-select').options[
-        document.getElementById('category-select').selectedIndex
-      ]?.text || cat;
+    if (mode === 'pull' && pullFacility && itemLbl && qty > 0) {
       box.style.display = 'block';
-      box.innerHTML = `Logging <strong>${qty}</strong> × <strong>${itemLabel}</strong> (${catLabel}) pulled from <strong>${selectedFacility}</strong>`;
+      box.innerHTML = `Logging <strong>${qty} × ${itemLbl}</strong> pulled from <strong>${pullFacility}</strong>`;
+    } else if (mode === 'transfer' && fromFacility && toFacility && itemLbl && qty > 0) {
+      box.style.display = 'block';
+      box.innerHTML = `Transferring <strong>${qty} × ${itemLbl}</strong> from <strong>${fromFacility}</strong> to <strong>${toFacility}</strong>`;
     } else {
       box.style.display = 'none';
     }
   }
 
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   function show(id) { document.getElementById(id).classList.add('visible'); }
   function hide(id) { document.getElementById(id).classList.remove('visible'); }
 
+  // ── Submit ────────────────────────────────────────────────────────────────────
   async function submitForm() {
     let valid = true;
 
-    if (!selectedFacility) { show('err-facility'); valid = false; }
+    if (mode === 'pull') {
+      if (!pullFacility) { show('err-pull-facility'); valid = false; }
+    } else {
+      if (!fromFacility) { show('err-from-facility'); valid = false; }
+      if (!toFacility)   { show('err-to-facility');   valid = false; }
+    }
 
-    const cat = document.getElementById('category-select').value;
+    const cat  = document.getElementById('category-select').value;
     const item = document.getElementById('item-select').value;
     if (!cat || !item) { show('err-item'); valid = false; }
 
     const qty = parseInt(document.getElementById('quantity').value);
     if (!qty || qty < 1) { show('err-qty'); valid = false; }
 
-    const name = document.getElementById('pulled_by').value.trim();
+    const name = document.getElementById('submitted_by').value.trim();
     if (!name) { show('err-name'); valid = false; }
 
     if (!valid) return;
 
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
-    btn.textContent = 'Logging...';
+    btn.textContent = mode === 'pull' ? 'Logging...' : 'Transferring...';
+
+    const itemLbl = document.getElementById('item-select').options[
+      document.getElementById('item-select').selectedIndex
+    ]?.text || item;
+    const notes = document.getElementById('notes').value.trim() || null;
 
     try {
-      const res = await fetch('/api/pull', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          facility: selectedFacility,
-          category: cat,
-          item,
-          quantity: qty,
-          pulled_by: name,
-          notes: document.getElementById('notes').value.trim() || null
-        })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Server error');
+      let res;
+      if (mode === 'pull') {
+        res = await fetch('/api/pull', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ facility: pullFacility, category: cat, item, quantity: qty, pulled_by: name, notes })
+        });
+      } else {
+        res = await fetch('/api/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from_facility: fromFacility, to_facility: toFacility, category: cat, item, quantity: qty, transferred_by: name, notes })
+        });
       }
 
-      const itemLabel = document.getElementById('item-select').options[
-        document.getElementById('item-select').selectedIndex
-      ]?.text || item;
-      document.getElementById('success-detail').textContent =
-        `${qty} × ${itemLabel} pulled from ${selectedFacility} has been recorded.`;
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Server error'); }
+
+      if (mode === 'pull') {
+        document.getElementById('success-icon').textContent  = '📦';
+        document.getElementById('success-title').textContent = 'Pull Logged!';
+        document.getElementById('success-detail').textContent = `${qty} × ${itemLbl} pulled from ${pullFacility} has been recorded.`;
+      } else {
+        document.getElementById('success-icon').textContent  = '🔄';
+        document.getElementById('success-title').textContent = 'Transfer Logged!';
+        document.getElementById('success-detail').textContent = `${qty} × ${itemLbl} transferred from ${fromFacility} to ${toFacility} has been recorded.`;
+      }
 
       document.getElementById('form-area').style.display = 'none';
       document.getElementById('success-screen').style.display = 'block';
@@ -458,7 +531,7 @@
     } catch (e) {
       alert('Error: ' + e.message);
       btn.disabled = false;
-      btn.textContent = 'Log Pull';
+      btn.textContent = mode === 'pull' ? 'Log Pull' : 'Log Transfer';
     }
   }
 </script>

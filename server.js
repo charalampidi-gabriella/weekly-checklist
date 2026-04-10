@@ -45,6 +45,19 @@ async function initDB() {
       notes     TEXT
     )
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS inventory_transfers (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_facility    TEXT    NOT NULL,
+      to_facility      TEXT    NOT NULL,
+      category         TEXT    NOT NULL,
+      item             TEXT    NOT NULL,
+      quantity         INTEGER NOT NULL,
+      transferred_by   TEXT    NOT NULL,
+      transferred_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+      notes            TEXT
+    )
+  `);
 }
 
 app.use(express.json());
@@ -173,13 +186,27 @@ async function getInventoryState(facility) {
       ? ['reels', 'ball_cases']
       : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
 
-    const pullRows = await db.execute({
-      sql: `SELECT category, item, SUM(quantity) as total
-            FROM inventory_pulls
-            WHERE facility = ? AND category IN (${categories.map(() => '?').join(',')}) AND pulled_at > ?
-            GROUP BY category, item`,
-      args: [facility, ...categories, count.submitted_at]
-    });
+    const catPlaceholders = categories.map(() => '?').join(',');
+    const [pullRows, trOutRows, trInRows] = await Promise.all([
+      db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_pulls
+              WHERE facility = ? AND category IN (${catPlaceholders}) AND pulled_at > ?
+              GROUP BY category, item`,
+        args: [facility, ...categories, count.submitted_at]
+      }),
+      db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_transfers
+              WHERE from_facility = ? AND category IN (${catPlaceholders}) AND transferred_at > ?
+              GROUP BY category, item`,
+        args: [facility, ...categories, count.submitted_at]
+      }),
+      db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_transfers
+              WHERE to_facility = ? AND category IN (${catPlaceholders}) AND transferred_at > ?
+              GROUP BY category, item`,
+        args: [facility, ...categories, count.submitted_at]
+      }),
+    ]);
 
     const pullsSince = {};
     for (const row of pullRows.rows) {
@@ -187,12 +214,35 @@ async function getInventoryState(facility) {
       pullsSince[row.category][row.item] = Number(row.total);
     }
 
+    const transfersOut = {};
+    for (const row of trOutRows.rows) {
+      if (!transfersOut[row.category]) transfersOut[row.category] = {};
+      transfersOut[row.category][row.item] = Number(row.total);
+    }
+
+    const transfersIn = {};
+    for (const row of trInRows.rows) {
+      if (!transfersIn[row.category]) transfersIn[row.category] = {};
+      transfersIn[row.category][row.item] = Number(row.total);
+    }
+
     const estimated = JSON.parse(JSON.stringify(items));
     for (const [cat, subItems] of Object.entries(pullsSince)) {
-      for (const [itm, pulled] of Object.entries(subItems)) {
-        if (estimated[cat]?.[itm] !== undefined) {
-          estimated[cat][itm] = Math.max(0, estimated[cat][itm] - pulled);
-        }
+      for (const [itm, qty] of Object.entries(subItems)) {
+        if (estimated[cat]?.[itm] !== undefined)
+          estimated[cat][itm] = Math.max(0, estimated[cat][itm] - qty);
+      }
+    }
+    for (const [cat, subItems] of Object.entries(transfersOut)) {
+      for (const [itm, qty] of Object.entries(subItems)) {
+        if (estimated[cat]?.[itm] !== undefined)
+          estimated[cat][itm] = Math.max(0, estimated[cat][itm] - qty);
+      }
+    }
+    for (const [cat, subItems] of Object.entries(transfersIn)) {
+      for (const [itm, qty] of Object.entries(subItems)) {
+        if (estimated[cat]?.[itm] !== undefined)
+          estimated[cat][itm] = estimated[cat][itm] + qty;
       }
     }
 
@@ -209,6 +259,8 @@ async function getInventoryState(facility) {
     state[type] = {
       last_count: { date: count.submitted_at, submitted_by: count.submitted_by, items },
       pulls_since: pullsSince,
+      transfers_out: transfersOut,
+      transfers_in: transfersIn,
       estimated,
       alerts
     };
@@ -271,6 +323,62 @@ app.get('/api/pulls', requireAdmin, async (req, res) => {
     res.json(rows.rows);
   } catch (err) {
     console.error('GET /api/pulls:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── POST /api/transfer ─────────────────────────────────────────────────────────
+app.post('/api/transfer', rateLimit, async (req, res) => {
+  try {
+    const { from_facility, to_facility, category, item, quantity, transferred_by, notes } = req.body;
+
+    if (!VALID_FACILITIES.includes(from_facility))
+      return res.status(400).json({ error: 'Invalid source facility' });
+    if (!VALID_FACILITIES.includes(to_facility))
+      return res.status(400).json({ error: 'Invalid destination facility' });
+    if (from_facility === to_facility)
+      return res.status(400).json({ error: 'Source and destination must be different' });
+    if (!transferred_by || typeof transferred_by !== 'string' || transferred_by.trim().length === 0)
+      return res.status(400).json({ error: 'Name is required' });
+    if (transferred_by.length > 100)
+      return res.status(400).json({ error: 'Name too long' });
+    const qty = parseInt(quantity);
+    if (!qty || qty < 1 || qty > 10000)
+      return res.status(400).json({ error: 'Invalid quantity' });
+    if (!category || typeof category !== 'string' || category.length > 50)
+      return res.status(400).json({ error: 'Invalid category' });
+    if (!item || typeof item !== 'string' || item.length > 100)
+      return res.status(400).json({ error: 'Invalid item' });
+
+    const cleanNotes = notes ? String(notes).trim().slice(0, 500) : null;
+
+    await db.execute({
+      sql: `INSERT INTO inventory_transfers (from_facility, to_facility, category, item, quantity, transferred_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [from_facility, to_facility, category, item, qty, transferred_by.trim(), cleanNotes]
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/transfer:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── GET /api/transfers ─────────────────────────────────────────────────────────
+app.get('/api/transfers', requireAdmin, async (req, res) => {
+  try {
+    const { facility } = req.query;
+    const args = [];
+    let sql = 'SELECT * FROM inventory_transfers';
+    if (facility && VALID_FACILITIES.includes(facility)) {
+      sql += ' WHERE from_facility = ? OR to_facility = ?';
+      args.push(facility, facility);
+    }
+    sql += ' ORDER BY transferred_at DESC LIMIT 200';
+    const rows = await db.execute({ sql, args });
+    res.json(rows.rows);
+  } catch (err) {
+    console.error('GET /api/transfers:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

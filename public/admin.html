@@ -407,6 +407,7 @@
   let ADMIN_KEY = new URLSearchParams(location.search).get('key') || '';
   let inventoryData = null;
   let allPulls = [];
+  let allTransfers = [];
   let currentTab = 'SATC';
 
   // ── Auth ────────────────────────────────────────────────────────────────────
@@ -420,9 +421,10 @@
     document.getElementById('main-area').style.display = 'block';
 
     try {
-      const [invRes, pullRes] = await Promise.all([
-        fetch('/api/inventory?key=' + encodeURIComponent(ADMIN_KEY)),
+      const [invRes, pullRes, transRes] = await Promise.all([
+        fetch('/api/inventory?key='  + encodeURIComponent(ADMIN_KEY)),
         fetch('/api/pulls?key='      + encodeURIComponent(ADMIN_KEY)),
+        fetch('/api/transfers?key='  + encodeURIComponent(ADMIN_KEY)),
       ]);
 
       if (invRes.status === 401) {
@@ -434,6 +436,7 @@
 
       inventoryData = await invRes.json();
       allPulls = await pullRes.json();
+      allTransfers = await transRes.json();
 
       renderAlerts();
       renderAllTabs();
@@ -514,21 +517,25 @@
       const catDef = CATALOG[cat];
       if (!catDef) continue;
 
-      rows += `<tr class="cat-header"><td colspan="5">${catDef.label}</td></tr>`;
+      rows += `<tr class="cat-header"><td colspan="6">${catDef.label}</td></tr>`;
 
       for (const [itemKey, itemName] of Object.entries(catDef.items)) {
         const counted  = state?.last_count?.items?.[cat]?.[itemKey];
         const pulled   = state?.pulls_since?.[cat]?.[itemKey] || 0;
+        const trOut    = state?.transfers_out?.[cat]?.[itemKey] || 0;
+        const trIn     = state?.transfers_in?.[cat]?.[itemKey] || 0;
+        const totalOut = pulled + trOut;
         const est      = state?.estimated?.[cat]?.[itemKey];
         const isAlert  = state?.alerts?.some(a => a.category === cat && a.item === itemKey);
         const alertThr = state?.alerts?.find(a => a.category === cat && a.item === itemKey)?.threshold;
 
-        const rowClass = isAlert ? ' class="alert-row"' : '';
-        const estStr = est !== undefined
+        const rowClass   = isAlert ? ' class="alert-row"' : '';
+        const countedStr = counted !== undefined ? counted : '<span style="color:#ccc">—</span>';
+        const outStr     = totalOut > 0 ? `<span style="color:#c0392b">−${totalOut}</span>` : '<span style="color:#ccc">0</span>';
+        const inStr      = trIn > 0 ? `<span style="color:#16a34a">+${trIn}</span>` : '<span style="color:#ccc">0</span>';
+        const estStr     = est !== undefined
           ? `<span class="est-num ${isAlert ? 'est-low' : ''}">${est}</span>`
           : '<span style="color:#ccc">—</span>';
-        const countedStr = counted !== undefined ? counted : '<span style="color:#ccc">—</span>';
-        const pulledStr  = pulled > 0 ? `<span style="color:#c0392b">−${pulled}</span>` : '<span style="color:#ccc">0</span>';
 
         let statusHtml = '';
         if (est === undefined) {
@@ -542,7 +549,8 @@
         rows += `<tr${rowClass}>
           <td>${esc(itemName)}</td>
           <td>${countedStr}</td>
-          <td>${pulledStr}</td>
+          <td>${outStr}</td>
+          <td>${inStr}</td>
           <td>${estStr}</td>
           <td>${statusHtml}</td>
         </tr>`;
@@ -560,7 +568,8 @@
               <thead><tr>
                 <th>Item</th>
                 <th>Last Count</th>
-                <th>Pulled Since</th>
+                <th>Out Since</th>
+                <th>In Since</th>
                 <th>Est. Remaining</th>
                 <th>Status</th>
               </tr></thead>
@@ -631,11 +640,17 @@
   }
 
   function renderPulls(fac) {
-    const pulls = fac ? allPulls.filter(p => p.facility === fac) : allPulls;
+    const pulls = (fac ? allPulls.filter(p => p.facility === fac) : allPulls)
+      .map(p => ({ ...p, _type: 'pull', _date: p.pulled_at }));
+    const transfers = (fac
+      ? allTransfers.filter(t => t.from_facility === fac || t.to_facility === fac)
+      : allTransfers).map(t => ({ ...t, _type: 'transfer', _date: t.transferred_at }));
+
+    const combined = [...pulls, ...transfers].sort((a, b) => new Date(b._date) - new Date(a._date));
     const el = document.getElementById('pull-history-body');
 
-    if (!pulls.length) {
-      el.innerHTML = '<div class="empty-state">No pulls recorded.</div>';
+    if (!combined.length) {
+      el.innerHTML = '<div class="empty-state">No activity recorded.</div>';
       return;
     }
 
@@ -643,24 +658,31 @@
       <table class="pull-table">
         <thead><tr>
           <th>Date</th>
-          <th>Facility</th>
+          <th>Type</th>
           <th>Item</th>
           <th>Qty</th>
-          <th>Pulled By</th>
+          <th>By</th>
         </tr></thead>
         <tbody>
-          ${pulls.map(p => {
-            const label = itemLabel(p.category, p.item);
-            return `<tr>
-              <td style="white-space:nowrap">${formatDate(p.pulled_at)}</td>
-              <td><span class="fac-badge">${esc(p.facility)}</span></td>
-              <td>
-                ${esc(label)}
-                ${p.notes ? `<div class="pull-notes">${esc(p.notes)}</div>` : ''}
-              </td>
-              <td><span class="pull-qty">${p.quantity}</span></td>
-              <td>${esc(p.pulled_by)}</td>
-            </tr>`;
+          ${combined.map(entry => {
+            const label = itemLabel(entry.category, entry.item);
+            if (entry._type === 'pull') {
+              return `<tr>
+                <td style="white-space:nowrap">${formatDate(entry.pulled_at)}</td>
+                <td><span class="fac-badge">${esc(entry.facility)}</span><br><span style="font-size:11px;color:#888">Pull</span></td>
+                <td>${esc(label)}${entry.notes ? `<div class="pull-notes">${esc(entry.notes)}</div>` : ''}</td>
+                <td><span class="pull-qty">${entry.quantity}</span></td>
+                <td>${esc(entry.pulled_by)}</td>
+              </tr>`;
+            } else {
+              return `<tr>
+                <td style="white-space:nowrap">${formatDate(entry.transferred_at)}</td>
+                <td><span class="fac-badge" style="background:#e8f0fb;color:#1e40af">${esc(entry.from_facility)} → ${esc(entry.to_facility)}</span><br><span style="font-size:11px;color:#888">Transfer</span></td>
+                <td>${esc(label)}${entry.notes ? `<div class="pull-notes">${esc(entry.notes)}</div>` : ''}</td>
+                <td><span class="pull-qty">${entry.quantity}</span></td>
+                <td>${esc(entry.transferred_by)}</td>
+              </tr>`;
+            }
           }).join('')}
         </tbody>
       </table>`;
