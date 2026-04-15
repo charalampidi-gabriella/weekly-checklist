@@ -11,6 +11,41 @@ const db = createClient({
 
 const VALID_FACILITIES = ['SATC', 'Pharr', 'Wilco'];
 
+const COUNT_SCHEDULE = {
+  biweekly: { startDate: '2026-04-23', intervalDays: 14 },
+  monthly:  { startDate: '2026-04-22', intervalDays: 28 },
+};
+
+function getScheduleDates(startDate, intervalDays) {
+  const msPerDay = 86400000;
+  const parts = startDate.split('-').map(Number);
+  const startMs = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+  const now = new Date();
+  const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const toDateStr = ms => new Date(ms).toISOString().slice(0, 10);
+
+  if (todayMs < startMs) {
+    return {
+      current_period_start: null,
+      days_into_period: null,
+      next_due: startDate,
+      days_until: Math.ceil((startMs - todayMs) / msPerDay),
+    };
+  }
+
+  const daysSinceStart = Math.floor((todayMs - startMs) / msPerDay);
+  const cycleIndex = Math.floor(daysSinceStart / intervalDays);
+  const currentDueMs = startMs + cycleIndex * intervalDays * msPerDay;
+  const nextDueMs = startMs + (cycleIndex + 1) * intervalDays * msPerDay;
+
+  return {
+    current_period_start: toDateStr(currentDueMs),
+    days_into_period: Math.floor((todayMs - currentDueMs) / msPerDay),
+    next_due: toDateStr(nextDueMs),
+    days_until: Math.ceil((nextDueMs - todayMs) / msPerDay),
+  };
+}
+
 // Alert thresholds: item is "low" when count is AT or BELOW this number
 const ALERT_THRESHOLDS = {
   reels: {
@@ -178,7 +213,7 @@ async function getInventoryState(facility) {
 
   for (const [type, rows] of [['biweekly', bwRows.rows], ['monthly', moRows.rows]]) {
     const categories = type === 'biweekly'
-      ? ['reels', 'ball_cases', 'concessions']
+      ? ['reels', 'ball_cases', 'concessions', 'supplies']
       : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
     const catPlaceholders = categories.map(() => '?').join(',');
 
@@ -398,6 +433,15 @@ app.post('/api/transfer', rateLimit, async (req, res) => {
     console.error('POST /api/transfer:', err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// ── GET /api/schedule ──────────────────────────────────────────────────────────
+app.get('/api/schedule', (req, res) => {
+  const result = {};
+  for (const [type, config] of Object.entries(COUNT_SCHEDULE)) {
+    result[type] = { ...getScheduleDates(config.startDate, config.intervalDays), interval_days: config.intervalDays };
+  }
+  res.json(result);
 });
 
 // ── GET /api/transfers ─────────────────────────────────────────────────────────

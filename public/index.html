@@ -100,6 +100,43 @@
     }
     .badge.biweekly { background: #dcfce7; color: #166534; }
     .badge.monthly  { background: #dbeafe; color: #1e40af; }
+
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .sched-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .sched-card .sched-type {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #888;
+      margin-bottom: 4px;
+    }
+    .sched-card .sched-date {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 6px;
+    }
+    .sched-pill {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 9px;
+      border-radius: 100px;
+    }
+    .sched-pill.green  { background: #dcfce7; color: #166534; }
+    .sched-pill.amber  { background: #fef3c7; color: #92400e; }
+    .sched-pill.red    { background: #fee2e2; color: #991b1b; }
   </style>
 </head>
 <body>
@@ -110,6 +147,12 @@
 </header>
 
 <main>
+  <div class="section-label">Count Schedule</div>
+  <div class="schedule-grid" id="schedule-grid">
+    <div class="sched-card"><div class="sched-type">Bi-Weekly</div><div class="sched-date" style="color:#ccc">Loading...</div></div>
+    <div class="sched-card"><div class="sched-type">Monthly</div><div class="sched-date" style="color:#ccc">Loading...</div></div>
+  </div>
+
   <div class="section-label">Count Forms</div>
 
   <a class="nav-card" href="biweekly.html">
@@ -153,5 +196,49 @@
   </a>
 </main>
 
+<script>
+  async function loadSchedule() {
+    try {
+      const res = await fetch('/api/schedule');
+      if (!res.ok) return;
+      const data = await res.json();
+      document.getElementById('schedule-grid').innerHTML =
+        renderSchedCard('Bi-Weekly', data.biweekly) +
+        renderSchedCard('Monthly',   data.monthly);
+    } catch (e) { /* silently ignore */ }
+  }
+
+  function renderSchedCard(label, s) {
+    let dateStr, pillClass, pillText;
+
+    if (s.current_period_start === null) {
+      // Before first scheduled date
+      const d = new Date(s.next_due + 'T12:00:00');
+      dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      pillClass = s.days_until <= 3 ? 'amber' : 'green';
+      pillText  = `In ${s.days_until}d`;
+    } else if (s.days_into_period === 0) {
+      // Due today
+      const d = new Date(s.current_period_start + 'T12:00:00');
+      dateStr  = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      pillClass = 'red';
+      pillText  = 'Due Today';
+    } else {
+      // Mid-period — show next due date
+      const d = new Date(s.next_due + 'T12:00:00');
+      dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      pillClass = s.days_until <= 3 ? 'amber' : 'green';
+      pillText  = `In ${s.days_until}d`;
+    }
+
+    return `<div class="sched-card">
+      <div class="sched-type">${label}</div>
+      <div class="sched-date">${dateStr}</div>
+      <span class="sched-pill ${pillClass}">${pillText}</span>
+    </div>`;
+  }
+
+  loadSchedule();
+</script>
 </body>
 </html>

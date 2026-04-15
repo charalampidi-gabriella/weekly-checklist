@@ -303,6 +303,22 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
+    .overdue-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      padding: 2px 8px;
+      border-radius: 100px;
+      margin-left: 8px;
+    }
+
     @media (max-width: 600px) {
       table.pull-table th:nth-child(5),
       table.pull-table td:nth-child(5) { display: none; }
@@ -376,6 +392,10 @@
       label: 'Concessions',
       items: { water_cases: 'Cases of Water' }
     },
+    supplies: {
+      label: 'Supplies',
+      items: { toilet_paper: 'Toilet Paper', hand_soap: 'Hand Soap Bottles' }
+    },
     prime_tour_grips: {
       label: 'Prime Tour Grips',
       items: { white: 'White', black: 'Black', pink: 'Pink', blue: 'Blue' }
@@ -405,7 +425,7 @@
     }
   };
 
-  const BIWEEKLY_CATS  = ['reels', 'ball_cases', 'concessions'];
+  const BIWEEKLY_CATS  = ['reels', 'ball_cases', 'concessions', 'supplies'];
   const MONTHLY_CATS   = ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
 
   // Load key from sessionStorage; if it was in the URL, save it and strip it
@@ -422,6 +442,7 @@
   let inventoryData = null;
   let allPulls = [];
   let allTransfers = [];
+  let scheduleData = null;
   let currentTab = 'SATC';
 
   function apiFetch(url) {
@@ -443,10 +464,11 @@
     document.getElementById('main-area').style.display = 'block';
 
     try {
-      const [invRes, pullRes, transRes] = await Promise.all([
+      const [invRes, pullRes, transRes, schedRes] = await Promise.all([
         apiFetch('/api/inventory'),
         apiFetch('/api/pulls'),
         apiFetch('/api/transfers'),
+        fetch('/api/schedule'),
       ]);
 
       if (invRes.status === 401) {
@@ -459,6 +481,7 @@
       inventoryData = await invRes.json();
       allPulls = await pullRes.json();
       allTransfers = await transRes.json();
+      if (schedRes.ok) scheduleData = await schedRes.json();
 
       renderAlerts();
       renderAllTabs();
@@ -518,11 +541,19 @@
 
   // ── Facility tab ────────────────────────────────────────────────────────────
   function renderFacilityTab(fac, data) {
-    return renderSection('Bi-Weekly Items', data.biweekly, BIWEEKLY_CATS) +
-           renderSection('Monthly Items',   data.monthly,  MONTHLY_CATS);
+    return renderSection('Bi-Weekly Items', data.biweekly, BIWEEKLY_CATS, 'biweekly') +
+           renderSection('Monthly Items',   data.monthly,  MONTHLY_CATS,  'monthly');
   }
 
-  function renderSection(title, state, categories) {
+  function renderSection(title, state, categories, schedType) {
+    const sched = schedType && scheduleData?.[schedType];
+    const periodStart = sched?.current_period_start;
+    const isOverdue = periodStart != null &&
+      (!state?.last_count || state.last_count.date < periodStart);
+    const overdueBadge = isOverdue
+      ? `<span class="overdue-badge">Overdue</span>`
+      : '';
+
     let header = '';
     if (state) {
       if (state.last_count) {
@@ -580,7 +611,7 @@
     return `
       <div class="inv-section">
         <div class="inv-section-header">
-          <h2>${title}</h2>
+          <h2>${title}${overdueBadge}</h2>
           <div class="last-count-info">${header || 'No count recorded yet'}</div>
         </div>
         ${rows
