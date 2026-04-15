@@ -436,11 +436,31 @@
   // ── Item catalog (for display names) ──────────────────────────────────────────
   const CATALOG = {
     reels: {
-      label: 'String Reels',
+      label: 'Polyester Strings',
       items: {
-        hawk_touch: 'Hawk Touch', hawk_tour_rpet: 'Hawk Tour RPET',
+        hawk_touch: 'Hawk Touch', hawk_tour_rpet: 'Hawk Tour rPET', hawk_power: 'Hawk Power',
         lynx_tour: 'Lynx Tour', lynx_touch: 'Lynx Touch',
-        velocity_mlt: 'Velocity MLT', rpm_blast: 'RPM Blast',
+        rpm_blast: 'RPM Blast', rpm_rough: 'RPM Rough', rpm_power: 'RPM Power',
+        polytour_pro_yellow: 'Polytour Pro Yellow', polytour_pro_blue: 'Polytour Pro Blue',
+        polytour_pro_teal: 'Polytour Pro Teal', polytour_pro_purple: 'Polytour Pro Purple',
+        polytour_pro_black: 'Polytour Pro Black', polytour_rev: 'Polytour Rev',
+        ice_code: 'Ice Code', razor_soft: 'Razor Soft',
+      }
+    },
+    gut_strings: {
+      label: 'Synthetic & Natural Gut',
+      items: {
+        synthetic_gut_head: 'Head Synthetic Gut',
+        synthetic_gut_babolat: 'Babolat Synthetic Gut',
+        touch_vs: 'Touch VS Natural Gut',
+      }
+    },
+    multifilament: {
+      label: 'Multifilament Strings',
+      items: {
+        x_one_biphase: 'X-One Biphase',
+        velocity_mlt: 'Velocity MLT',
+        reflex_mlt: 'Reflex MLT',
       }
     },
     ball_cases: {
@@ -484,7 +504,7 @@
     }
   };
 
-  const BIWEEKLY_CATS  = ['reels', 'ball_cases', 'concessions', 'supplies'];
+  const BIWEEKLY_CATS  = ['reels', 'gut_strings', 'multifilament', 'ball_cases', 'concessions', 'supplies'];
   const MONTHLY_CATS   = ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
 
   // Load key from sessionStorage; if it was in the URL, save it and strip it

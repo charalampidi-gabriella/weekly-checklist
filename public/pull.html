@@ -269,9 +269,12 @@
     <div class="field-label">Category</div>
     <select id="category-select" onchange="onCategoryChange()">
       <option value="">Select a category...</option>
-      <option value="reels">String Reels</option>
+      <option value="reels">Polyester Strings</option>
+      <option value="gut_strings">Synthetic &amp; Natural Gut</option>
+      <option value="multifilament">Multifilament Strings</option>
       <option value="ball_cases">Ball Cases</option>
       <option value="concessions">Concessions</option>
+      <option value="supplies">Supplies</option>
       <option value="prime_tour_grips">Prime Tour Grips</option>
       <option value="pro_grips">Pro Grips</option>
       <option value="wristbands">Wristbands</option>
@@ -329,12 +332,32 @@
 <script>
   const ITEMS_BY_CATEGORY = {
     reels: [
-      { key: 'hawk_touch',     label: 'Hawk Touch' },
-      { key: 'hawk_tour_rpet', label: 'Hawk Tour RPET' },
-      { key: 'lynx_tour',      label: 'Lynx Tour' },
-      { key: 'lynx_touch',     label: 'Lynx Touch' },
-      { key: 'velocity_mlt',   label: 'Velocity MLT' },
-      { key: 'rpm_blast',      label: 'RPM Blast' },
+      { key: 'hawk_touch',          label: 'Hawk Touch' },
+      { key: 'hawk_tour_rpet',      label: 'Hawk Tour rPET' },
+      { key: 'hawk_power',          label: 'Hawk Power' },
+      { key: 'lynx_tour',           label: 'Lynx Tour' },
+      { key: 'lynx_touch',          label: 'Lynx Touch' },
+      { key: 'rpm_blast',           label: 'RPM Blast' },
+      { key: 'rpm_rough',           label: 'RPM Rough' },
+      { key: 'rpm_power',           label: 'RPM Power' },
+      { key: 'polytour_pro_yellow', label: 'Polytour Pro Yellow' },
+      { key: 'polytour_pro_blue',   label: 'Polytour Pro Blue' },
+      { key: 'polytour_pro_teal',   label: 'Polytour Pro Teal' },
+      { key: 'polytour_pro_purple', label: 'Polytour Pro Purple' },
+      { key: 'polytour_pro_black',  label: 'Polytour Pro Black' },
+      { key: 'polytour_rev',        label: 'Polytour Rev' },
+      { key: 'ice_code',            label: 'Ice Code' },
+      { key: 'razor_soft',          label: 'Razor Soft' },
+    ],
+    gut_strings: [
+      { key: 'synthetic_gut_head',    label: 'Head Synthetic Gut' },
+      { key: 'synthetic_gut_babolat', label: 'Babolat Synthetic Gut' },
+      { key: 'touch_vs',              label: 'Touch VS Natural Gut' },
+    ],
+    multifilament: [
+      { key: 'x_one_biphase', label: 'X-One Biphase' },
+      { key: 'velocity_mlt',  label: 'Velocity MLT' },
+      { key: 'reflex_mlt',    label: 'Reflex MLT' },
     ],
     ball_cases:       [{ key: 'full_cases', label: 'Full Cases' }, { key: 'open_cans', label: 'Open Cans' }],
     prime_tour_grips: [{ key: 'white', label: 'White' }, { key: 'black', label: 'Black' }, { key: 'pink', label: 'Pink' }, { key: 'blue', label: 'Blue' }],
@@ -350,6 +373,10 @@
     ],
     concessions: [
       { key: 'water_cases', label: 'Cases of Water' },
+    ],
+    supplies: [
+      { key: 'toilet_paper', label: 'Toilet Paper' },
+      { key: 'hand_soap', label: 'Hand Soap Bottles' },
     ],
   };
 

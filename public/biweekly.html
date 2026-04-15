@@ -202,7 +202,7 @@
   <a class="back-btn" href="index.html">‹</a>
   <div class="header-text">
     <h1>Bi-Weekly Count</h1>
-    <p>String reels &amp; ball cases</p>
+    <p>Strings, balls &amp; supplies</p>
   </div>
 </header>
 
@@ -220,10 +220,11 @@
     <div class="error-msg" id="err-facility">Please select a facility.</div>
   </div>
 
-  <!-- STRING REELS -->
+  <!-- POLYESTER STRINGS -->
   <div class="card">
-    <h2>String Reels</h2>
+    <h2>Polyester Strings</h2>
 
+    <div class="sub-label">Head</div>
     <div class="inventory-row">
       <span class="inv-label">Hawk Touch</span>
       <div class="count-control">
@@ -232,16 +233,22 @@
         <button type="button" class="count-btn" data-action="inc" data-target="hawk_touch">+</button>
       </div>
     </div>
-
     <div class="inventory-row">
-      <span class="inv-label">Hawk Tour RPET</span>
+      <span class="inv-label">Hawk Tour rPET</span>
       <div class="count-control">
         <button type="button" class="count-btn" data-action="dec" data-target="hawk_tour_rpet">−</button>
         <input class="count-display" type="number" id="hawk_tour_rpet" data-category="reels" data-item="hawk_tour_rpet" value="0" min="0">
         <button type="button" class="count-btn" data-action="inc" data-target="hawk_tour_rpet">+</button>
       </div>
     </div>
-
+    <div class="inventory-row">
+      <span class="inv-label">Hawk Power</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="hawk_power">−</button>
+        <input class="count-display" type="number" id="hawk_power" data-category="reels" data-item="hawk_power" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="hawk_power">+</button>
+      </div>
+    </div>
     <div class="inventory-row">
       <span class="inv-label">Lynx Tour</span>
       <div class="count-control">
@@ -250,7 +257,6 @@
         <button type="button" class="count-btn" data-action="inc" data-target="lynx_tour">+</button>
       </div>
     </div>
-
     <div class="inventory-row">
       <span class="inv-label">Lynx Touch</span>
       <div class="count-control">
@@ -260,21 +266,163 @@
       </div>
     </div>
 
-    <div class="inventory-row">
-      <span class="inv-label">Velocity MLT</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="velocity_mlt">−</button>
-        <input class="count-display" type="number" id="velocity_mlt" data-category="reels" data-item="velocity_mlt" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="velocity_mlt">+</button>
-      </div>
-    </div>
-
+    <div class="sub-label">Babolat</div>
     <div class="inventory-row">
       <span class="inv-label">RPM Blast</span>
       <div class="count-control">
         <button type="button" class="count-btn" data-action="dec" data-target="rpm_blast">−</button>
         <input class="count-display" type="number" id="rpm_blast" data-category="reels" data-item="rpm_blast" value="0" min="0">
         <button type="button" class="count-btn" data-action="inc" data-target="rpm_blast">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">RPM Rough</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="rpm_rough">−</button>
+        <input class="count-display" type="number" id="rpm_rough" data-category="reels" data-item="rpm_rough" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="rpm_rough">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">RPM Power</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="rpm_power">−</button>
+        <input class="count-display" type="number" id="rpm_power" data-category="reels" data-item="rpm_power" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="rpm_power">+</button>
+      </div>
+    </div>
+
+    <div class="sub-label">Yonex</div>
+    <div class="inventory-row">
+      <span class="inv-label">Polytour Pro Yellow</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_yellow">−</button>
+        <input class="count-display" type="number" id="polytour_pro_yellow" data-category="reels" data-item="polytour_pro_yellow" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_yellow">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Polytour Pro Blue</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_blue">−</button>
+        <input class="count-display" type="number" id="polytour_pro_blue" data-category="reels" data-item="polytour_pro_blue" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_blue">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Polytour Pro Teal</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_teal">−</button>
+        <input class="count-display" type="number" id="polytour_pro_teal" data-category="reels" data-item="polytour_pro_teal" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_teal">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Polytour Pro Purple</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_purple">−</button>
+        <input class="count-display" type="number" id="polytour_pro_purple" data-category="reels" data-item="polytour_pro_purple" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_purple">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Polytour Pro Black</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_black">−</button>
+        <input class="count-display" type="number" id="polytour_pro_black" data-category="reels" data-item="polytour_pro_black" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_black">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Polytour Rev</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="polytour_rev">−</button>
+        <input class="count-display" type="number" id="polytour_rev" data-category="reels" data-item="polytour_rev" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="polytour_rev">+</button>
+      </div>
+    </div>
+
+    <div class="sub-label">Tecnifibre</div>
+    <div class="inventory-row">
+      <span class="inv-label">Ice Code</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="ice_code">−</button>
+        <input class="count-display" type="number" id="ice_code" data-category="reels" data-item="ice_code" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="ice_code">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Razor Soft</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="razor_soft">−</button>
+        <input class="count-display" type="number" id="razor_soft" data-category="reels" data-item="razor_soft" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="razor_soft">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYNTHETIC & NATURAL GUT -->
+  <div class="card">
+    <h2>Synthetic &amp; Natural Gut</h2>
+
+    <div class="sub-label">Head</div>
+    <div class="inventory-row">
+      <span class="inv-label">Synthetic Gut</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="synthetic_gut_head">−</button>
+        <input class="count-display" type="number" id="synthetic_gut_head" data-category="gut_strings" data-item="synthetic_gut_head" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="synthetic_gut_head">+</button>
+      </div>
+    </div>
+
+    <div class="sub-label">Babolat</div>
+    <div class="inventory-row">
+      <span class="inv-label">Synthetic Gut</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="synthetic_gut_babolat">−</button>
+        <input class="count-display" type="number" id="synthetic_gut_babolat" data-category="gut_strings" data-item="synthetic_gut_babolat" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="synthetic_gut_babolat">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Touch VS Natural Gut</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="touch_vs">−</button>
+        <input class="count-display" type="number" id="touch_vs" data-category="gut_strings" data-item="touch_vs" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="touch_vs">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MULTIFILAMENT STRINGS -->
+  <div class="card">
+    <h2>Multifilament Strings</h2>
+
+    <div class="sub-label">Tecnifibre</div>
+    <div class="inventory-row">
+      <span class="inv-label">X-One Biphase</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="x_one_biphase">−</button>
+        <input class="count-display" type="number" id="x_one_biphase" data-category="multifilament" data-item="x_one_biphase" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="x_one_biphase">+</button>
+      </div>
+    </div>
+
+    <div class="sub-label">Head</div>
+    <div class="inventory-row">
+      <span class="inv-label">Velocity MLT</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="velocity_mlt">−</button>
+        <input class="count-display" type="number" id="velocity_mlt" data-category="multifilament" data-item="velocity_mlt" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="velocity_mlt">+</button>
+      </div>
+    </div>
+    <div class="inventory-row">
+      <span class="inv-label">Reflex MLT</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="reflex_mlt">−</button>
+        <input class="count-display" type="number" id="reflex_mlt" data-category="multifilament" data-item="reflex_mlt" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="reflex_mlt">+</button>
       </div>
     </div>
   </div>
@@ -312,6 +460,29 @@
         <button type="button" class="count-btn" data-action="dec" data-target="water_cases">−</button>
         <input class="count-display" type="number" id="water_cases" data-category="concessions" data-item="water_cases" value="0" min="0">
         <button type="button" class="count-btn" data-action="inc" data-target="water_cases">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUPPLIES -->
+  <div class="card">
+    <h2>Supplies</h2>
+
+    <div class="inventory-row">
+      <span class="inv-label">Toilet Paper</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="toilet_paper">−</button>
+        <input class="count-display" type="number" id="toilet_paper" data-category="supplies" data-item="toilet_paper" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="toilet_paper">+</button>
+      </div>
+    </div>
+
+    <div class="inventory-row">
+      <span class="inv-label">Hand Soap Bottles</span>
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="hand_soap">−</button>
+        <input class="count-display" type="number" id="hand_soap" data-category="supplies" data-item="hand_soap" value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="hand_soap">+</button>
       </div>
     </div>
   </div>

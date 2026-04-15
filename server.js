@@ -49,8 +49,18 @@ function getScheduleDates(startDate, intervalDays) {
 // Alert thresholds: item is "low" when count is AT or BELOW this number
 const ALERT_THRESHOLDS = {
   reels: {
-    hawk_touch: 3, hawk_tour_rpet: 3, lynx_tour: 3,
-    lynx_touch: 3, velocity_mlt: 3, rpm_blast: 4,
+    hawk_touch: 3, hawk_tour_rpet: 3, hawk_power: 3,
+    lynx_tour: 3, lynx_touch: 3,
+    rpm_blast: 3, rpm_rough: 3, rpm_power: 3,
+    polytour_pro_yellow: 2, polytour_pro_blue: 2, polytour_pro_teal: 2,
+    polytour_pro_purple: 2, polytour_pro_black: 2, polytour_rev: 2,
+    ice_code: 2, razor_soft: 2,
+  },
+  gut_strings: {
+    synthetic_gut_head: 2, synthetic_gut_babolat: 2, touch_vs: 1,
+  },
+  multifilament: {
+    x_one_biphase: 2, velocity_mlt: 2, reflex_mlt: 2,
   },
   prime_tour_grips: { white: 15, black: 15, pink: 15, blue: 15 },
   pro_grips: { total: 20 },
@@ -213,7 +223,7 @@ async function getInventoryState(facility) {
 
   for (const [type, rows] of [['biweekly', bwRows.rows], ['monthly', moRows.rows]]) {
     const categories = type === 'biweekly'
-      ? ['reels', 'ball_cases', 'concessions', 'supplies']
+      ? ['reels', 'gut_strings', 'multifilament', 'ball_cases', 'concessions', 'supplies']
       : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
     const catPlaceholders = categories.map(() => '?').join(',');
 
