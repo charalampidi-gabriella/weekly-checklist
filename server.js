@@ -440,7 +440,7 @@ app.get('/api/counts', requireAdmin, async (req, res) => {
   try {
     const { facility } = req.query;
     const args = [];
-    let sql = 'SELECT id, facility, count_type, submitted_by, submitted_at FROM inventory_counts';
+    let sql = 'SELECT id, facility, count_type, submitted_by, submitted_at, items FROM inventory_counts';
     if (facility && VALID_FACILITIES.includes(facility)) {
       sql += ' WHERE facility = ?';
       args.push(facility);
