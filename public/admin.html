@@ -298,6 +298,31 @@
     .pull-qty { font-weight: 800; font-size: 15px; }
     .pull-notes { color: #888; font-size: 12px; margin-top: 2px; }
 
+    /* History tab */
+    .history-filters {
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .filter-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #888; min-width: 56px; }
+    .event-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .event-badge.pull     { background: #fee2e2; color: #991b1b; }
+    .event-badge.transfer { background: #dbeafe; color: #1e40af; }
+    .event-badge.count    { background: #dcfce7; color: #166534; }
+
     .empty-state { padding: 30px; text-align: center; color: #aaa; font-size: 14px; }
     .loading { padding: 30px; text-align: center; color: #aaa; font-size: 14px; }
     .tab-content { display: none; }
@@ -352,25 +377,14 @@
     <button class="tab-btn" onclick="switchTab('Pharr')">Pharr</button>
     <button class="tab-btn" onclick="switchTab('Wilco')">Wilco</button>
     <button class="tab-btn" onclick="switchTab('combined')">All Facilities</button>
+    <button class="tab-btn" onclick="switchTab('history')">History</button>
   </div>
 
   <div id="tab-SATC"     class="tab-content active"><div class="loading">Loading...</div></div>
   <div id="tab-Pharr"    class="tab-content"><div class="loading">Loading...</div></div>
   <div id="tab-Wilco"    class="tab-content"><div class="loading">Loading...</div></div>
   <div id="tab-combined" class="tab-content"><div class="loading">Loading...</div></div>
-
-  <div class="pull-history">
-    <div class="pull-history-header">
-      <h2>Pull History</h2>
-      <div class="pull-filter">
-        <button class="pull-filter-btn active" onclick="filterPulls('')">All</button>
-        <button class="pull-filter-btn" onclick="filterPulls('SATC')">SATC</button>
-        <button class="pull-filter-btn" onclick="filterPulls('Pharr')">Pharr</button>
-        <button class="pull-filter-btn" onclick="filterPulls('Wilco')">Wilco</button>
-      </div>
-    </div>
-    <div id="pull-history-body"><div class="loading">Loading...</div></div>
-  </div>
+  <div id="tab-history"  class="tab-content"><div class="loading">Loading...</div></div>
 </main>
 
 <script>
@@ -442,8 +456,11 @@
   let inventoryData = null;
   let allPulls = [];
   let allTransfers = [];
+  let allCounts = [];
   let scheduleData = null;
   let currentTab = 'SATC';
+  let historyFacFilter  = '';
+  let historyTypeFilter = '';
 
   function apiFetch(url) {
     return fetch(url, { headers: { 'x-admin-key': ADMIN_KEY } });
@@ -464,11 +481,12 @@
     document.getElementById('main-area').style.display = 'block';
 
     try {
-      const [invRes, pullRes, transRes, schedRes] = await Promise.all([
+      const [invRes, pullRes, transRes, schedRes, countsRes] = await Promise.all([
         apiFetch('/api/inventory'),
         apiFetch('/api/pulls'),
         apiFetch('/api/transfers'),
         fetch('/api/schedule'),
+        apiFetch('/api/counts'),
       ]);
 
       if (invRes.status === 401) {
@@ -481,11 +499,12 @@
       inventoryData = await invRes.json();
       allPulls = await pullRes.json();
       allTransfers = await transRes.json();
-      if (schedRes.ok) scheduleData = await schedRes.json();
+      if (schedRes.ok)   scheduleData = await schedRes.json();
+      if (countsRes.ok)  allCounts    = await countsRes.json();
 
       renderAlerts();
       renderAllTabs();
-      renderPulls('');
+      renderHistory();
     } catch (e) {
       document.getElementById('tab-SATC').innerHTML = '<div class="empty-state">Failed to load data. Check your connection.</div>';
     }
@@ -525,8 +544,10 @@
   // ── Tabs ────────────────────────────────────────────────────────────────────
   function switchTab(tab) {
     currentTab = tab;
+    const labelMap = { combined: 'All', history: 'History' };
+    const label = labelMap[tab] || tab;
     document.querySelectorAll('.tab-btn').forEach(b => {
-      b.classList.toggle('active', b.textContent.trim().startsWith(tab === 'combined' ? 'All' : tab));
+      b.classList.toggle('active', b.textContent.trim().startsWith(label));
     });
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
@@ -679,63 +700,91 @@
            renderCombinedSection('Monthly Items',   combined.monthly,  MONTHLY_CATS);
   }
 
-  // ── Pull history ────────────────────────────────────────────────────────────
-  let activePullFilter = '';
-  function filterPulls(fac) {
-    activePullFilter = fac;
-    document.querySelectorAll('.pull-filter-btn').forEach(b => {
-      b.classList.toggle('active', b.textContent.trim() === (fac || 'All'));
-    });
-    renderPulls(fac);
+  // ── History tab ─────────────────────────────────────────────────────────────
+  function setHistoryFilter(kind, value) {
+    if (kind === 'fac')  historyFacFilter  = value;
+    if (kind === 'type') historyTypeFilter = value;
+    renderHistory();
   }
 
-  function renderPulls(fac) {
-    const pulls = (fac ? allPulls.filter(p => p.facility === fac) : allPulls)
+  function renderHistory() {
+    const fac  = historyFacFilter;
+    const type = historyTypeFilter;
+
+    const pulls = allPulls
+      .filter(p => !fac || p.facility === fac)
       .map(p => ({ ...p, _type: 'pull', _date: p.pulled_at }));
-    const transfers = (fac
-      ? allTransfers.filter(t => t.from_facility === fac || t.to_facility === fac)
-      : allTransfers).map(t => ({ ...t, _type: 'transfer', _date: t.transferred_at }));
 
-    const combined = [...pulls, ...transfers].sort((a, b) => new Date(b._date) - new Date(a._date));
-    const el = document.getElementById('pull-history-body');
+    const transfers = allTransfers
+      .filter(t => !fac || t.from_facility === fac || t.to_facility === fac)
+      .map(t => ({ ...t, _type: 'transfer', _date: t.transferred_at }));
 
-    if (!combined.length) {
-      el.innerHTML = '<div class="empty-state">No activity recorded.</div>';
-      return;
+    const counts = allCounts
+      .filter(c => !fac || c.facility === fac)
+      .map(c => ({ ...c, _type: 'count', _date: c.submitted_at }));
+
+    let all = [...pulls, ...transfers, ...counts];
+    if (type) all = all.filter(e => e._type === type);
+    all.sort((a, b) => new Date(b._date) - new Date(a._date));
+
+    const facBtns = ['', 'SATC', 'Pharr', 'Wilco'].map(f =>
+      `<button class="pull-filter-btn${fac === f ? ' active' : ''}" onclick="setHistoryFilter('fac','${f}')">${f || 'All'}</button>`
+    ).join('');
+
+    const typeBtns = [['', 'All'], ['pull', 'Pulls'], ['transfer', 'Transfers'], ['count', 'Counts']].map(([v, l]) =>
+      `<button class="pull-filter-btn${type === v ? ' active' : ''}" onclick="setHistoryFilter('type','${v}')">${l}</button>`
+    ).join('');
+
+    let tableHtml;
+    if (!all.length) {
+      tableHtml = '<div class="empty-state">No activity matches these filters.</div>';
+    } else {
+      const rows = all.map(e => {
+        if (e._type === 'pull') {
+          return `<tr>
+            <td style="white-space:nowrap">${formatDate(e.pulled_at)}</td>
+            <td><span class="event-badge pull">Pull</span></td>
+            <td><span class="fac-badge">${esc(e.facility)}</span></td>
+            <td>${esc(itemLabel(e.category, e.item))}${e.notes ? `<div class="pull-notes">${esc(e.notes)}</div>` : ''}</td>
+            <td><span class="pull-qty">${e.quantity}</span></td>
+            <td>${esc(e.pulled_by)}</td>
+          </tr>`;
+        } else if (e._type === 'transfer') {
+          return `<tr>
+            <td style="white-space:nowrap">${formatDate(e.transferred_at)}</td>
+            <td><span class="event-badge transfer">Transfer</span></td>
+            <td><span class="fac-badge" style="background:#dbeafe;color:#1e40af">${esc(e.from_facility)} → ${esc(e.to_facility)}</span></td>
+            <td>${esc(itemLabel(e.category, e.item))}${e.notes ? `<div class="pull-notes">${esc(e.notes)}</div>` : ''}</td>
+            <td><span class="pull-qty">${e.quantity}</span></td>
+            <td>${esc(e.transferred_by)}</td>
+          </tr>`;
+        } else {
+          const typeLabel = e.count_type === 'biweekly' ? 'Bi-Weekly Count' : 'Monthly Count';
+          return `<tr>
+            <td style="white-space:nowrap">${formatDate(e.submitted_at)}</td>
+            <td><span class="event-badge count">Count</span></td>
+            <td><span class="fac-badge">${esc(e.facility)}</span></td>
+            <td>${typeLabel}</td>
+            <td>—</td>
+            <td>${esc(e.submitted_by)}</td>
+          </tr>`;
+        }
+      }).join('');
+
+      tableHtml = `<table class="pull-table">
+        <thead><tr>
+          <th>Date</th><th>Event</th><th>Facility</th><th>Details</th><th>Qty</th><th>By</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
     }
 
-    el.innerHTML = `
-      <table class="pull-table">
-        <thead><tr>
-          <th>Date</th>
-          <th>Type</th>
-          <th>Item</th>
-          <th>Qty</th>
-          <th>By</th>
-        </tr></thead>
-        <tbody>
-          ${combined.map(entry => {
-            const label = itemLabel(entry.category, entry.item);
-            if (entry._type === 'pull') {
-              return `<tr>
-                <td style="white-space:nowrap">${formatDate(entry.pulled_at)}</td>
-                <td><span class="fac-badge">${esc(entry.facility)}</span><br><span style="font-size:11px;color:#888">Pull</span></td>
-                <td>${esc(label)}${entry.notes ? `<div class="pull-notes">${esc(entry.notes)}</div>` : ''}</td>
-                <td><span class="pull-qty">${entry.quantity}</span></td>
-                <td>${esc(entry.pulled_by)}</td>
-              </tr>`;
-            } else {
-              return `<tr>
-                <td style="white-space:nowrap">${formatDate(entry.transferred_at)}</td>
-                <td><span class="fac-badge" style="background:#e8f0fb;color:#1e40af">${esc(entry.from_facility)} → ${esc(entry.to_facility)}</span><br><span style="font-size:11px;color:#888">Transfer</span></td>
-                <td>${esc(label)}${entry.notes ? `<div class="pull-notes">${esc(entry.notes)}</div>` : ''}</td>
-                <td><span class="pull-qty">${entry.quantity}</span></td>
-                <td>${esc(entry.transferred_by)}</td>
-              </tr>`;
-            }
-          }).join('')}
-        </tbody>
-      </table>`;
+    document.getElementById('tab-history').innerHTML = `
+      <div class="history-filters">
+        <div class="filter-row"><span class="filter-label">Facility</span>${facBtns}</div>
+        <div class="filter-row"><span class="filter-label">Type</span>${typeBtns}</div>
+      </div>
+      <div class="inv-section">${tableHtml}</div>`;
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

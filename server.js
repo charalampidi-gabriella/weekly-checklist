@@ -435,6 +435,25 @@ app.post('/api/transfer', rateLimit, async (req, res) => {
   }
 });
 
+// ── GET /api/counts ────────────────────────────────────────────────────────────
+app.get('/api/counts', requireAdmin, async (req, res) => {
+  try {
+    const { facility } = req.query;
+    const args = [];
+    let sql = 'SELECT id, facility, count_type, submitted_by, submitted_at FROM inventory_counts';
+    if (facility && VALID_FACILITIES.includes(facility)) {
+      sql += ' WHERE facility = ?';
+      args.push(facility);
+    }
+    sql += ' ORDER BY submitted_at DESC LIMIT 200';
+    const rows = await db.execute({ sql, args });
+    res.json(rows.rows);
+  } catch (err) {
+    console.error('GET /api/counts:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── GET /api/schedule ──────────────────────────────────────────────────────────
 app.get('/api/schedule', (req, res) => {
   const result = {};
