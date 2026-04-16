@@ -216,6 +216,14 @@
     .status-na  { background: #f5f5f5; color: #aaa; }
     .est-num { font-size: 16px; font-weight: 800; }
     .est-low { color: #dc2626; }
+    .est-total { font-size: 16px; font-weight: 800; }
+    .baseline  { display: block; font-size: 11px; font-weight: 500; color: #aaa; margin-top: 1px; }
+    .activity-line { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; font-size: 12px; }
+    .act-pull    { color: #2c7a3e; }
+    .act-sale    { color: #c0392b; }
+    .act-receipt { color: #b45309; }
+    .act-trx     { color: #1e40af; }
+    .act-none    { color: #ccc; }
 
     /* Pull history */
     .pull-history {
@@ -362,14 +370,96 @@
       border-radius: 6px;
       white-space: nowrap;
     }
-    .event-badge.pull     { background: #fee2e2; color: #991b1b; }
+    .event-badge.pull     { background: #dcfce7; color: #166534; }
+    .event-badge.sale     { background: #fee2e2; color: #991b1b; }
+    .event-badge.receipt  { background: #fef3c7; color: #92400e; }
     .event-badge.transfer { background: #dbeafe; color: #1e40af; }
-    .event-badge.count    { background: #dcfce7; color: #166534; }
+    .event-badge.count    { background: #e0e7ff; color: #3730a3; }
 
     .empty-state { padding: 30px; text-align: center; color: #aaa; font-size: 14px; }
     .loading { padding: 30px; text-align: center; color: #aaa; font-size: 14px; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+
+    /* Reconcile tab */
+    .rec-controls {
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .rec-info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #1e3a8a;
+      line-height: 1.45;
+    }
+    .rec-meta {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 18px;
+      background: #f8faf8;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 12px;
+      color: #666;
+    }
+    .rec-meta strong { color: #1a1a1a; }
+    .rec-input {
+      width: 64px;
+      border: 1.5px solid #d0d0d0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: right;
+      font-family: inherit;
+      outline: none;
+      background: #fff;
+    }
+    .rec-input:focus { border-color: #2c7a3e; }
+    .variance-good { color: #166534; font-weight: 800; }
+    .variance-bad  { color: #991b1b; font-weight: 800; }
+    .variance-note { font-size: 10px; font-weight: 600; color: #888; display: block; margin-top: 1px; letter-spacing: .04em; text-transform: uppercase; }
+    .rec-save-row {
+      padding: 14px 18px;
+      border-top: 1px solid #f0f0f0;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .rec-save-row input[type="text"] {
+      flex: 1;
+      min-width: 140px;
+      border: 1.5px solid #d0d0d0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+    }
+    .rec-save-row input[type="text"]:focus { border-color: #2c7a3e; }
+    .rec-save-btn {
+      background: #2c7a3e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .rec-save-btn:disabled { background: #a0c4a8; cursor: not-allowed; }
+    .rec-save-status { font-size: 12px; color: #666; }
 
     .overdue-badge {
       display: inline-flex;
@@ -420,14 +510,16 @@
     <button class="tab-btn" onclick="switchTab('Pharr')">Pharr</button>
     <button class="tab-btn" onclick="switchTab('Wilco')">Wilco</button>
     <button class="tab-btn" onclick="switchTab('combined')">All Facilities</button>
+    <button class="tab-btn" onclick="switchTab('reconcile')">Reconcile</button>
     <button class="tab-btn" onclick="switchTab('history')">History</button>
   </div>
 
-  <div id="tab-SATC"     class="tab-content active"><div class="loading">Loading...</div></div>
-  <div id="tab-Pharr"    class="tab-content"><div class="loading">Loading...</div></div>
-  <div id="tab-Wilco"    class="tab-content"><div class="loading">Loading...</div></div>
-  <div id="tab-combined" class="tab-content"><div class="loading">Loading...</div></div>
-  <div id="tab-history"  class="tab-content"><div class="loading">Loading...</div></div>
+  <div id="tab-SATC"      class="tab-content active"><div class="loading">Loading...</div></div>
+  <div id="tab-Pharr"     class="tab-content"><div class="loading">Loading...</div></div>
+  <div id="tab-Wilco"     class="tab-content"><div class="loading">Loading...</div></div>
+  <div id="tab-combined"  class="tab-content"><div class="loading">Loading...</div></div>
+  <div id="tab-reconcile" class="tab-content"><div class="loading">Loading...</div></div>
+  <div id="tab-history"   class="tab-content"><div class="loading">Loading...</div></div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -527,6 +619,10 @@
   let historyFacFilter  = '';
   let historyTypeFilter = '';
   let countChart = null;
+  let reconcileInitialized = false;
+  let reconcileFacility = 'SATC';
+  let reconcileType     = 'biweekly';
+  let reconcileData     = null;
 
   function apiFetch(url) {
     return fetch(url, { headers: { 'x-admin-key': ADMIN_KEY } });
@@ -610,13 +706,14 @@
   // ── Tabs ────────────────────────────────────────────────────────────────────
   function switchTab(tab) {
     currentTab = tab;
-    const labelMap = { combined: 'All', history: 'History' };
+    const labelMap = { combined: 'All', history: 'History', reconcile: 'Reconcile' };
     const label = labelMap[tab] || tab;
     document.querySelectorAll('.tab-btn').forEach(b => {
       b.classList.toggle('active', b.textContent.trim().startsWith(label));
     });
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'reconcile' && !reconcileInitialized) initReconcileTab();
   }
 
   function renderAllTabs() {
@@ -630,6 +727,13 @@
   function renderFacilityTab(fac, data) {
     return renderSection('Bi-Weekly Items', data.biweekly, BIWEEKLY_CATS, 'biweekly') +
            renderSection('Monthly Items',   data.monthly,  MONTHLY_CATS,  'monthly');
+  }
+
+  // Normalize a stored last_count item value (may be legacy number) → { storage, display }
+  function readLastCount(val) {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'object') return { storage: Number(val.storage) || 0, display: Number(val.display) || 0 };
+    return { storage: Number(val) || 0, display: 0 };
   }
 
   function renderSection(title, state, categories, schedType) {
@@ -656,28 +760,42 @@
       const catDef = CATALOG[cat];
       if (!catDef) continue;
 
-      rows += `<tr class="cat-header"><td colspan="5">${catDef.label}</td></tr>`;
+      rows += `<tr class="cat-header"><td colspan="6">${catDef.label}</td></tr>`;
 
       for (const [itemKey, itemName] of Object.entries(catDef.items)) {
-        const counted  = state?.last_count?.items?.[cat]?.[itemKey];
-        const pulled   = state?.pulls_since?.[cat]?.[itemKey] || 0;
-        const trOut    = state?.transfers_out?.[cat]?.[itemKey] || 0;
-        const trIn     = state?.transfers_in?.[cat]?.[itemKey] || 0;
-        const totalOut = pulled + trOut;
+        const counted  = readLastCount(state?.last_count?.items?.[cat]?.[itemKey]);
+        const pulled   = state?.pulls_since?.[cat]?.[itemKey]    || 0;
+        const sold     = state?.sales_since?.[cat]?.[itemKey]    || 0;
+        const received = state?.receipts_since?.[cat]?.[itemKey] || 0;
+        const trOut    = state?.transfers_out?.[cat]?.[itemKey]  || 0;
+        const trIn     = state?.transfers_in?.[cat]?.[itemKey]   || 0;
         const est      = state?.estimated?.[cat]?.[itemKey];
         const isAlert  = state?.alerts?.some(a => a.category === cat && a.item === itemKey);
         const alertThr = state?.alerts?.find(a => a.category === cat && a.item === itemKey)?.threshold;
 
-        const rowClass   = isAlert ? ' class="alert-row"' : '';
-        const countedStr = counted !== undefined ? counted : '<span style="color:#ccc">—</span>';
-        const outStr     = totalOut > 0 ? `<span style="color:#c0392b">−${totalOut}</span>` : '<span style="color:#ccc">0</span>';
-        const inStr      = trIn > 0 ? `<span style="color:#16a34a">+${trIn}</span>` : '<span style="color:#ccc">0</span>';
-        const estStr     = est !== undefined
-          ? `<span class="est-num ${isAlert ? 'est-low' : ''}">${est}</span>`
-          : '<span style="color:#ccc">—</span>';
+        const baseline = counted ? `<span class="baseline">was ${counted.storage + counted.display}</span>` : '';
+        const baselineS = counted ? `<span class="baseline">was ${counted.storage}</span>` : '';
+        const baselineD = counted ? `<span class="baseline">was ${counted.display}</span>` : '';
+        const dash = '<span style="color:#ccc">—</span>';
 
-        let statusHtml = '';
-        if (est === undefined) {
+        const storageStr = est ? `<span class="est-num">${est.storage}</span>${baselineS}` : dash;
+        const displayStr = est ? `<span class="est-num">${est.display}</span>${baselineD}` : dash;
+        const totalStr   = est
+          ? `<span class="est-total ${isAlert ? 'est-low' : ''}">${est.total}</span>${baseline}`
+          : dash;
+
+        const actParts = [];
+        if (received) actParts.push(`<span class="act-receipt">+${received} received</span>`);
+        if (pulled)   actParts.push(`<span class="act-pull">${pulled} pulled</span>`);
+        if (sold)     actParts.push(`<span class="act-sale">${sold} sold</span>`);
+        if (trOut)    actParts.push(`<span class="act-trx">−${trOut} out</span>`);
+        if (trIn)     actParts.push(`<span class="act-trx">+${trIn} in</span>`);
+        const actStr = actParts.length
+          ? `<div class="activity-line">${actParts.join('')}</div>`
+          : `<span class="act-none">—</span>`;
+
+        let statusHtml;
+        if (!est) {
           statusHtml = '<span class="status-badge status-na">No data</span>';
         } else if (isAlert) {
           statusHtml = `<span class="status-badge status-low">LOW ≤${alertThr}</span>`;
@@ -685,12 +803,14 @@
           statusHtml = '<span class="status-badge status-ok">OK</span>';
         }
 
-        rows += `<tr>
+        const rowClass = isAlert ? ' class="alert-row"' : '';
+        rows += `<tr${rowClass}>
           <td>${esc(itemName)}</td>
-          <td>${countedStr}</td>
-          <td>${outStr}</td>
-          <td>${inStr}</td>
-          <td>${estStr}</td>
+          <td>${storageStr}</td>
+          <td>${displayStr}</td>
+          <td>${totalStr}</td>
+          <td>${actStr}</td>
+          <td>${statusHtml}</td>
         </tr>`;
       }
     }
@@ -705,10 +825,11 @@
           ? `<table class="inv-table">
               <thead><tr>
                 <th>Item</th>
-                <th>Last Count</th>
-                <th>Out Since</th>
-                <th>In Since</th>
-                <th>Est. Remaining</th>
+                <th>Storage</th>
+                <th>Display</th>
+                <th>Total</th>
+                <th>Activity Since</th>
+                <th>Status</th>
               </tr></thead>
               <tbody>${rows}</tbody>
              </table>`
@@ -729,22 +850,27 @@
       for (const cat of categories) {
         const catDef = CATALOG[cat];
         if (!catDef) continue;
-        rows += `<tr class="cat-header"><td colspan="3">${catDef.label}</td></tr>`;
+        rows += `<tr class="cat-header"><td colspan="5">${catDef.label}</td></tr>`;
         for (const [itemKey, itemName] of Object.entries(catDef.items)) {
           const est = state?.estimated?.[cat]?.[itemKey];
           const alertEntry = (state?.alerts || []).find(a => a.category === cat && a.item === itemKey);
           const isAlert = !!alertEntry;
           const rowClass = isAlert ? ' class="alert-row"' : '';
-          const estStr = est !== undefined
-            ? `<span class="est-num ${isAlert ? 'est-low' : ''}">${est}</span>`
-            : '<span style="color:#ccc">—</span>';
+          const dash = '<span style="color:#ccc">—</span>';
+          const storageStr = est ? `<span class="est-num">${est.storage}</span>` : dash;
+          const displayStr = est ? `<span class="est-num">${est.display}</span>` : dash;
+          const totalStr   = est
+            ? `<span class="est-total ${isAlert ? 'est-low' : ''}">${est.total}</span>`
+            : dash;
           const alertsStr = isAlert
-            ? `<span class="status-badge status-low">LOW — ${alertEntry.current} total (order at ≤${alertEntry.threshold})</span>`
+            ? `<span class="status-badge status-low">LOW (order at ≤${alertEntry.threshold})</span>`
             : '<span class="status-badge status-ok">OK</span>';
 
           rows += `<tr${rowClass}>
             <td>${esc(itemName)}</td>
-            <td>${estStr}</td>
+            <td>${storageStr}</td>
+            <td>${displayStr}</td>
+            <td>${totalStr}</td>
             <td>${alertsStr}</td>
           </tr>`;
         }
@@ -756,7 +882,7 @@
           <div class="last-count-info">Sum of estimated remaining across SATC, Pharr &amp; Wilco</div>
         </div>
         <table class="inv-table">
-          <thead><tr><th>Item</th><th>Total Est. Remaining</th><th>Alerts</th></tr></thead>
+          <thead><tr><th>Item</th><th>Storage</th><th>Display</th><th>Total</th><th>Status</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
@@ -809,7 +935,12 @@
 
     const pulls = allPulls
       .filter(p => !fac || p.facility === fac)
-      .map(p => ({ ...p, _type: 'pull', _date: p.pulled_at }));
+      .map(p => {
+        const t = p.type === 'pull' ? 'pull'
+                : p.type === 'receipt' ? 'receipt'
+                : 'sale';
+        return { ...p, _type: t, _date: p.pulled_at };
+      });
 
     const transfers = allTransfers
       .filter(t => !fac || t.from_facility === fac || t.to_facility === fac)
@@ -827,7 +958,7 @@
       `<button class="pull-filter-btn${fac === f ? ' active' : ''}" onclick="setHistoryFilter('fac','${f}')">${f || 'All'}</button>`
     ).join('');
 
-    const typeBtns = [['', 'All'], ['pull', 'Pulls'], ['transfer', 'Transfers'], ['count', 'Counts']].map(([v, l]) =>
+    const typeBtns = [['', 'All'], ['pull', 'Pulls'], ['receipt', 'Receipts'], ['sale', 'Sales'], ['transfer', 'Transfers'], ['count', 'Counts']].map(([v, l]) =>
       `<button class="pull-filter-btn${type === v ? ' active' : ''}" onclick="setHistoryFilter('type','${v}')">${l}</button>`
     ).join('');
 
@@ -836,10 +967,12 @@
       tableHtml = '<div class="empty-state">No activity matches these filters.</div>';
     } else {
       const rows = all.map(e => {
-        if (e._type === 'pull') {
+        if (e._type === 'pull' || e._type === 'sale' || e._type === 'receipt') {
+          const badgeClass = e._type;
+          const badgeLabel = e._type === 'pull' ? 'Pull' : e._type === 'receipt' ? 'Receipt' : 'Sale';
           return `<tr>
             <td style="white-space:nowrap">${formatDate(e.pulled_at)}</td>
-            <td><span class="event-badge pull">Pull</span></td>
+            <td><span class="event-badge ${badgeClass}">${badgeLabel}</span></td>
             <td><span class="fac-badge">${esc(e.facility)}</span></td>
             <td>${esc(itemLabel(e.category, e.item))}${e.notes ? `<div class="pull-notes">${esc(e.notes)}</div>` : ''}</td>
             <td><span class="pull-qty">${e.quantity}</span></td>
@@ -927,7 +1060,10 @@
           try { items = JSON.parse(c.items); } catch(e) { return null; }
           const val = items?.[cat]?.[item];
           if (val === undefined || val === null) return null;
-          return { x: new Date(c.submitted_at.replace(' ', 'T') + 'Z'), y: val };
+          const y = typeof val === 'object'
+            ? (Number(val.storage) || 0) + (Number(val.display) || 0)
+            : Number(val) || 0;
+          return { x: new Date(c.submitted_at.replace(' ', 'T') + 'Z'), y };
         })
         .filter(Boolean)
         .sort((a, b) => a.x - b.x);
@@ -992,6 +1128,221 @@
         }
       }
     });
+  }
+
+  // ── Reconcile tab ───────────────────────────────────────────────────────────
+  function initReconcileTab() {
+    reconcileInitialized = true;
+    loadReconcileData();
+  }
+
+  async function loadReconcileData() {
+    const container = document.getElementById('tab-reconcile');
+    container.innerHTML = renderReconcileShell() + '<div class="loading">Loading reconciliation...</div>';
+    try {
+      const res = await apiFetch(`/api/reconcile?facility=${reconcileFacility}&count_type=${reconcileType}`);
+      reconcileData = await res.json();
+      renderReconcileTab();
+    } catch (e) {
+      container.innerHTML = renderReconcileShell() +
+        '<div class="empty-state">Failed to load reconciliation data.</div>';
+    }
+  }
+
+  function renderReconcileShell() {
+    const facBtns = ['SATC', 'Pharr', 'Wilco'].map(f =>
+      `<button class="pull-filter-btn${reconcileFacility === f ? ' active' : ''}" onclick="setReconcile('fac','${f}')">${f}</button>`
+    ).join('');
+    const typeBtns = [['biweekly','Bi-Weekly'],['monthly','Monthly']].map(([v,l]) =>
+      `<button class="pull-filter-btn${reconcileType === v ? ' active' : ''}" onclick="setReconcile('type','${v}')">${l}</button>`
+    ).join('');
+    return `
+      <div class="rec-controls">
+        <div class="rec-info">
+          Compare the two most recent counts to verify sales against your POS report.
+          <strong>Expected Sold</strong> is derived from the count totals and transfers;
+          enter your POS-reported sold quantities to flag mismatches.
+        </div>
+        <div class="filter-row"><span class="filter-label">Facility</span>${facBtns}</div>
+        <div class="filter-row"><span class="filter-label">Period</span>${typeBtns}</div>
+      </div>`;
+  }
+
+  function setReconcile(kind, value) {
+    if (kind === 'fac')  reconcileFacility = value;
+    if (kind === 'type') reconcileType     = value;
+    loadReconcileData();
+  }
+
+  function renderReconcileTab() {
+    const container = document.getElementById('tab-reconcile');
+    const data = reconcileData;
+
+    if (!data || !data.current) {
+      container.innerHTML = renderReconcileShell() +
+        '<div class="empty-state">No counts submitted yet for this facility + period.</div>';
+      return;
+    }
+    if (!data.previous) {
+      container.innerHTML = renderReconcileShell() +
+        `<div class="empty-state">
+           Only one count exists so far (${formatDate(data.current.date)}).<br>
+           Submit another count to enable reconciliation.
+         </div>`;
+      return;
+    }
+
+    const cats = reconcileType === 'biweekly' ? BIWEEKLY_CATS : MONTHLY_CATS;
+    let rows = '';
+
+    for (const cat of cats) {
+      const catDef = CATALOG[cat];
+      if (!catDef) continue;
+      rows += `<tr class="cat-header"><td colspan="9">${catDef.label}</td></tr>`;
+      for (const [itemKey, itemName] of Object.entries(catDef.items)) {
+        const prevT = data.previous.items?.[cat]?.[itemKey]?.total || 0;
+        const currT = data.current.items?.[cat]?.[itemKey]?.total  || 0;
+        const trIn  = data.transfers_in?.[cat]?.[itemKey]  || 0;
+        const trOut = data.transfers_out?.[cat]?.[itemKey] || 0;
+        const recv  = data.receipts?.[cat]?.[itemKey]      || 0;
+        const appS  = data.app_sales?.[cat]?.[itemKey]     || 0;
+        const expected = prevT + trIn + recv - trOut - currT - appS;
+        const posVal   = data.pos_sales?.[cat]?.[itemKey] ?? '';
+
+        const trStr = [];
+        if (trIn)  trStr.push(`<span class="act-trx">+${trIn}</span>`);
+        if (trOut) trStr.push(`<span class="act-trx">−${trOut}</span>`);
+        const trDisplay = trStr.length ? trStr.join(' ') : '<span style="color:#ccc">—</span>';
+
+        const recvStr = recv
+          ? `<span class="act-receipt">+${recv}</span>`
+          : '<span style="color:#ccc">—</span>';
+
+        const appStr = appS
+          ? `<span class="act-sale">${appS}</span>`
+          : '<span style="color:#ccc">—</span>';
+
+        const expClass = expected < 0 ? 'variance-bad' : '';
+        const expDisplay = `<span class="${expClass}">${expected}</span>`;
+
+        const inputId = `rec__${cat}__${itemKey}`;
+        const inputHtml = `<input type="number" inputmode="numeric" min="0"
+          class="rec-input" id="${inputId}"
+          data-cat="${cat}" data-item="${itemKey}" data-expected="${expected}"
+          value="${posVal}" onchange="updateVariance('${cat}','${itemKey}')"
+          oninput="updateVariance('${cat}','${itemKey}')">`;
+        const varianceId = `var__${cat}__${itemKey}`;
+
+        rows += `<tr>
+          <td>${esc(itemName)}</td>
+          <td>${prevT}</td>
+          <td>${currT}</td>
+          <td>${recvStr}</td>
+          <td>${trDisplay}</td>
+          <td>${appStr}</td>
+          <td>${expDisplay}</td>
+          <td>${inputHtml}</td>
+          <td id="${varianceId}">${renderVariance(posVal, expected)}</td>
+        </tr>`;
+      }
+    }
+
+    const savedMeta = data.pos_entered_at
+      ? `POS entries last saved ${formatDate(data.pos_entered_at)}${data.pos_entered_by ? ' by ' + esc(data.pos_entered_by) : ''}`
+      : 'No POS entries saved yet.';
+
+    container.innerHTML = renderReconcileShell() + `
+      <div class="inv-section">
+        <div class="rec-meta">
+          <div>Previous: <strong>${formatDate(data.previous.date)}</strong> by ${esc(data.previous.submitted_by)}</div>
+          <div>Current: <strong>${formatDate(data.current.date)}</strong> by ${esc(data.current.submitted_by)}</div>
+        </div>
+        <table class="inv-table">
+          <thead><tr>
+            <th style="text-align:left">Item</th>
+            <th>Previous</th>
+            <th>Current</th>
+            <th>Received</th>
+            <th>Transfers</th>
+            <th>App Sales</th>
+            <th>Expected Sold</th>
+            <th>POS Sold</th>
+            <th>Variance</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="rec-save-row">
+          <input type="text" id="rec-entered-by" placeholder="Your name" value="${esc(data.pos_entered_by || '')}">
+          <button class="rec-save-btn" onclick="saveReconcile()">Save POS Entries</button>
+          <span class="rec-save-status" id="rec-save-status">${savedMeta}</span>
+        </div>
+      </div>`;
+  }
+
+  function renderVariance(posVal, expected) {
+    if (posVal === '' || posVal === null || posVal === undefined) {
+      return '<span style="color:#ccc">—</span>';
+    }
+    const pos = parseInt(posVal);
+    if (isNaN(pos)) return '<span style="color:#ccc">—</span>';
+    const diff = pos - expected;
+    if (diff === 0) {
+      return `<span class="variance-good">✓ Match</span><span class="variance-note">POS − Expected = 0</span>`;
+    }
+    const sign = diff > 0 ? '+' : '';
+    const note = diff > 0 ? 'POS &gt; Expected' : 'Unaccounted loss';
+    return `<span class="variance-bad">${sign}${diff}</span><span class="variance-note">${note}</span>`;
+  }
+
+  function updateVariance(cat, itemKey) {
+    const input = document.getElementById(`rec__${cat}__${itemKey}`);
+    const cell  = document.getElementById(`var__${cat}__${itemKey}`);
+    if (!input || !cell) return;
+    const expected = parseInt(input.dataset.expected) || 0;
+    cell.innerHTML = renderVariance(input.value, expected);
+  }
+
+  async function saveReconcile() {
+    if (!reconcileData || !reconcileData.current) return;
+    const enteredBy = document.getElementById('rec-entered-by').value.trim();
+    const status = document.getElementById('rec-save-status');
+    const btn = document.querySelector('.rec-save-btn');
+
+    const payload = {};
+    document.querySelectorAll('.rec-input').forEach(inp => {
+      const v = inp.value;
+      if (v === '' || v === null) return;
+      const n = parseInt(v);
+      if (isNaN(n) || n < 0) return;
+      const cat = inp.dataset.cat;
+      const itm = inp.dataset.item;
+      if (!payload[cat]) payload[cat] = {};
+      payload[cat][itm] = n;
+    });
+
+    btn.disabled = true;
+    status.textContent = 'Saving...';
+    try {
+      const res = await fetch('/api/reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        body: JSON.stringify({
+          count_id: reconcileData.current.id,
+          pos_sales: payload,
+          entered_by: enteredBy,
+        })
+      });
+      if (!res.ok) throw new Error('save failed');
+      status.textContent = 'Saved.';
+      // Update in-memory data so switching facility + back won't lose UI state
+      reconcileData.pos_sales = payload;
+      reconcileData.pos_entered_by = enteredBy || null;
+      reconcileData.pos_entered_at = new Date().toISOString();
+    } catch (e) {
+      status.textContent = 'Save failed. Try again.';
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

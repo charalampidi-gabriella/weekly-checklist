@@ -30,7 +30,7 @@
     header .header-text h1 { font-size: 20px; font-weight: 700; }
     header .header-text p  { font-size: 13px; opacity: .8; margin-top: 2px; }
 
-    main { max-width: 520px; margin: 0 auto; padding: 16px; }
+    main { max-width: 560px; margin: 0 auto; padding: 16px; }
 
     .card {
       background: #fff;
@@ -48,6 +48,38 @@
       margin-bottom: 14px;
       padding-bottom: 8px;
       border-bottom: 2px solid #e8f0ea;
+    }
+
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #1e3a8a;
+      line-height: 1.45;
+    }
+    .info-box strong { font-weight: 700; }
+
+    .col-headers {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 0 8px;
+      border-bottom: 1px solid #f0f0f0;
+      margin-bottom: 4px;
+    }
+    .col-headers .spacer { flex: 1 1 auto; }
+    .col-headers .col-labels { display: flex; gap: 8px; flex-shrink: 0; }
+    .col-headers .col-label {
+      width: 128px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: .06em;
     }
 
     .facility-grid {
@@ -90,27 +122,29 @@
     .inventory-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 9px 0;
+      gap: 12px;
+      padding: 8px 0;
       border-bottom: 1px solid #f0f0f0;
     }
     .inventory-row:last-child { border-bottom: none; }
-    .inventory-row .inv-label {
+    .inv-label {
+      flex: 1 1 auto;
       font-size: 15px;
-      flex: 1;
-      padding-right: 12px;
+      min-width: 90px;
     }
 
+    .count-pair-group { display: flex; gap: 8px; flex-shrink: 0; }
     .count-control {
       display: flex;
       align-items: center;
       border: 2px solid #d0d0d0;
       border-radius: 10px;
       overflow: hidden;
+      width: 128px;
     }
     .count-btn {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 38px;
       border: none;
       background: #f5f5f5;
       font-size: 20px;
@@ -125,14 +159,15 @@
     }
     .count-btn:active { background: #e0e0e0; }
     .count-display {
-      width: 52px;
+      width: 100%;
       text-align: center;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
       border: none;
       background: #fff;
-      padding: 0 4px;
+      padding: 0 2px;
       -moz-appearance: textfield;
+      min-width: 0;
     }
     .count-display::-webkit-outer-spin-button,
     .count-display::-webkit-inner-spin-button { -webkit-appearance: none; }
@@ -194,6 +229,13 @@
     }
     .btn-again { background: #2c7a3e; color: #fff; }
     .btn-home  { background: #e8f0ea; color: #2c7a3e; }
+
+    @media (max-width: 460px) {
+      .count-control { width: 108px; }
+      .count-btn { width: 32px; height: 36px; font-size: 18px; }
+      .count-display { font-size: 16px; }
+      .col-headers .col-label { width: 108px; }
+    }
   </style>
 </head>
 <body>
@@ -209,6 +251,10 @@
 <div id="form-area">
 <main>
 
+  <div class="info-box">
+    Count items in <strong>two places</strong>: what's in <strong>Storage</strong> (backroom) and what's out on <strong>Display</strong> (floor). Record each separately.
+  </div>
+
   <!-- FACILITY -->
   <div class="card">
     <h2>Facility</h2>
@@ -220,213 +266,7 @@
     <div class="error-msg" id="err-facility">Please select a facility.</div>
   </div>
 
-  <!-- GRIPS -->
-  <div class="card">
-    <h2>Grips</h2>
-
-    <div class="sub-label">Prime Tour Grips</div>
-
-    <div class="inventory-row">
-      <span class="inv-label">White</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="pt_white">−</button>
-        <input class="count-display" type="number" id="pt_white" data-category="prime_tour_grips" data-item="white" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="pt_white">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Black</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="pt_black">−</button>
-        <input class="count-display" type="number" id="pt_black" data-category="prime_tour_grips" data-item="black" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="pt_black">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Pink</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="pt_pink">−</button>
-        <input class="count-display" type="number" id="pt_pink" data-category="prime_tour_grips" data-item="pink" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="pt_pink">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Blue</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="pt_blue">−</button>
-        <input class="count-display" type="number" id="pt_blue" data-category="prime_tour_grips" data-item="blue" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="pt_blue">+</button>
-      </div>
-    </div>
-
-    <div class="sub-label">Pro Grips</div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Pro Grips (total)</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="pro_grips_total">−</button>
-        <input class="count-display" type="number" id="pro_grips_total" data-category="pro_grips" data-item="total" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="pro_grips_total">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- WRISTBANDS -->
-  <div class="card">
-    <h2>Wristbands</h2>
-
-    <div class="sub-label">2.5 inch</div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Black</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="wb_25_black">−</button>
-        <input class="count-display" type="number" id="wb_25_black" data-category="wristbands" data-item="2_5in_black" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="wb_25_black">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">White</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="wb_25_white">−</button>
-        <input class="count-display" type="number" id="wb_25_white" data-category="wristbands" data-item="2_5in_white" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="wb_25_white">+</button>
-      </div>
-    </div>
-
-    <div class="sub-label">5 inch</div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Black</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="wb_5_black">−</button>
-        <input class="count-display" type="number" id="wb_5_black" data-category="wristbands" data-item="5in_black" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="wb_5_black">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">White</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="wb_5_white">−</button>
-        <input class="count-display" type="number" id="wb_5_white" data-category="wristbands" data-item="5in_white" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="wb_5_white">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- HEADBANDS -->
-  <div class="card">
-    <h2>Headbands</h2>
-
-    <div class="inventory-row">
-      <span class="inv-label">Black</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="hb_black">−</button>
-        <input class="count-display" type="number" id="hb_black" data-category="headbands" data-item="black" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="hb_black">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">White</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="hb_white">−</button>
-        <input class="count-display" type="number" id="hb_white" data-category="headbands" data-item="white" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="hb_white">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- RACKETS -->
-  <div class="card">
-    <h2>Rackets</h2>
-
-    <div class="inventory-row">
-      <span class="inv-label">Boom 2026</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="boom_2026">−</button>
-        <input class="count-display" type="number" id="boom_2026" data-category="rackets" data-item="boom_2026" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="boom_2026">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Speed 2026</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="speed_2026">−</button>
-        <input class="count-display" type="number" id="speed_2026" data-category="rackets" data-item="speed_2026" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="speed_2026">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Speed Legend</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="speed_legend">−</button>
-        <input class="count-display" type="number" id="speed_legend" data-category="rackets" data-item="speed_legend" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="speed_legend">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Gravity</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="gravity">−</button>
-        <input class="count-display" type="number" id="gravity" data-category="rackets" data-item="gravity" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="gravity">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Radical</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="radical">−</button>
-        <input class="count-display" type="number" id="radical" data-category="rackets" data-item="radical" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="radical">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Extreme</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="extreme">−</button>
-        <input class="count-display" type="number" id="extreme" data-category="rackets" data-item="extreme" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="extreme">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Boom 2024</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="boom_2024">−</button>
-        <input class="count-display" type="number" id="boom_2024" data-category="rackets" data-item="boom_2024" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="boom_2024">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Boom Neon</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="boom_neon">−</button>
-        <input class="count-display" type="number" id="boom_neon" data-category="rackets" data-item="boom_neon" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="boom_neon">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Boom Ashe</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="boom_ashe">−</button>
-        <input class="count-display" type="number" id="boom_ashe" data-category="rackets" data-item="boom_ashe" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="boom_ashe">+</button>
-      </div>
-    </div>
-  </div>
+  <div id="inventory-cards"></div>
 
   <!-- NAME -->
   <div class="card">
@@ -452,25 +292,111 @@
 </div>
 
 <script>
+  const SCHEMA = [
+    {
+      title: 'Grips',
+      groups: [
+        { label: 'Prime Tour Grips', category: 'prime_tour_grips', items: [
+          ['white', 'White'], ['black', 'Black'], ['pink', 'Pink'], ['blue', 'Blue'],
+        ]},
+        { label: 'Pro Grips', category: 'pro_grips', items: [
+          ['total', 'Pro Grips (total)'],
+        ]},
+      ],
+    },
+    {
+      title: 'Wristbands',
+      groups: [
+        { label: '2.5 inch', category: 'wristbands', items: [
+          ['2_5in_black', 'Black'], ['2_5in_white', 'White'],
+        ]},
+        { label: '5 inch', category: 'wristbands', items: [
+          ['5in_black', 'Black'], ['5in_white', 'White'],
+        ]},
+      ],
+    },
+    {
+      title: 'Headbands',
+      groups: [{ category: 'headbands', items: [
+        ['black', 'Black'], ['white', 'White'],
+      ]}],
+    },
+    {
+      title: 'Rackets',
+      groups: [{ category: 'rackets', items: [
+        ['boom_2026', 'Boom 2026'], ['speed_2026', 'Speed 2026'],
+        ['speed_legend', 'Speed Legend'], ['gravity', 'Gravity'],
+        ['radical', 'Radical'], ['extreme', 'Extreme'],
+        ['boom_2024', 'Boom 2024'], ['boom_neon', 'Boom Neon'],
+        ['boom_ashe', 'Boom Ashe'],
+      ]}],
+    },
+  ];
+
+  function renderInventoryCards() {
+    const root = document.getElementById('inventory-cards');
+    root.innerHTML = SCHEMA.map(card => `
+      <div class="card">
+        <h2>${card.title}</h2>
+        <div class="col-headers">
+          <div class="spacer"></div>
+          <div class="col-labels">
+            <div class="col-label">Storage</div>
+            <div class="col-label">Display</div>
+          </div>
+        </div>
+        ${card.groups.map(g => `
+          ${g.label ? `<div class="sub-label">${g.label}</div>` : ''}
+          ${g.items.map(([key, name]) => renderRow(g.category, key, name)).join('')}
+        `).join('')}
+      </div>
+    `).join('');
+  }
+
+  function renderRow(cat, key, name) {
+    return `
+      <div class="inventory-row">
+        <div class="inv-label">${name}</div>
+        <div class="count-pair-group">
+          ${renderControl(cat, key, 'storage')}
+          ${renderControl(cat, key, 'display')}
+        </div>
+      </div>`;
+  }
+
+  function renderControl(cat, key, loc) {
+    const id = `${cat}__${key}__${loc}`;
+    return `
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="${id}">−</button>
+        <input class="count-display" type="number" inputmode="numeric"
+               id="${id}" data-category="${cat}" data-item="${key}" data-loc="${loc}"
+               value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="${id}">+</button>
+      </div>`;
+  }
+
   let selectedFacility = null;
 
-  document.querySelectorAll('.facility-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.facility-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedFacility = btn.dataset.facility;
-      hide('err-facility');
+  function bindEvents() {
+    document.querySelectorAll('.facility-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.facility-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedFacility = btn.dataset.facility;
+        hide('err-facility');
+      });
     });
-  });
 
-  document.querySelectorAll('.count-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const input = document.getElementById(btn.dataset.target);
-      const val = parseInt(input.value) || 0;
-      if (btn.dataset.action === 'inc') input.value = val + 1;
-      if (btn.dataset.action === 'dec') input.value = Math.max(0, val - 1);
+    document.querySelectorAll('.count-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        const val = parseInt(input.value) || 0;
+        if (btn.dataset.action === 'inc') input.value = val + 1;
+        if (btn.dataset.action === 'dec') input.value = Math.max(0, val - 1);
+      });
     });
-  });
+  }
 
   function show(id) { document.getElementById(id).classList.add('visible'); }
   function hide(id) { document.getElementById(id).classList.remove('visible'); }
@@ -480,8 +406,10 @@
     document.querySelectorAll('.count-display[data-category]').forEach(input => {
       const cat = input.dataset.category;
       const itm = input.dataset.item;
-      if (!items[cat]) items[cat] = {};
-      items[cat][itm] = parseInt(input.value) || 0;
+      const loc = input.dataset.loc;
+      if (!items[cat])        items[cat] = {};
+      if (!items[cat][itm])   items[cat][itm] = { storage: 0, display: 0 };
+      items[cat][itm][loc] = parseInt(input.value) || 0;
     });
     return items;
   }
@@ -521,6 +449,9 @@
       btn.textContent = 'Submit Monthly Count';
     }
   }
+
+  renderInventoryCards();
+  bindEvents();
 </script>
 </body>
 </html>

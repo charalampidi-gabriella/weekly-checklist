@@ -103,6 +103,20 @@ async function initDB() {
       notes            TEXT
     )
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS pos_reconciliations (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      count_id    INTEGER NOT NULL UNIQUE,
+      pos_sales   TEXT    NOT NULL,
+      entered_by  TEXT,
+      entered_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  // Add `type` column to inventory_pulls (idempotent: ALTER throws if exists)
+  try { await db.execute(`ALTER TABLE inventory_pulls ADD COLUMN type TEXT`); } catch (e) {}
+  // Legacy rows (type IS NULL) are treated as sales — that matches old behavior
+  // where a "pull" directly decremented the single total count
+  try { await db.execute(`UPDATE inventory_pulls SET type = 'sale' WHERE type IS NULL`); } catch (e) {}
 }
 
 app.use(express.json());
@@ -130,6 +144,8 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// Items JSON shape: { category: { item: { storage: N, display: M } } }
+// Accepts legacy shape { category: { item: N } } and normalizes to { storage: N, display: 0 }
 function sanitizeItems(items) {
   const result = {};
   if (!items || typeof items !== 'object') return result;
@@ -138,11 +154,32 @@ function sanitizeItems(items) {
     const cleanCat = String(cat).slice(0, 50);
     result[cleanCat] = {};
     for (const [itm, val] of Object.entries(subItems)) {
-      const n = parseInt(val);
-      result[cleanCat][String(itm).slice(0, 100)] = isNaN(n) || n < 0 ? 0 : n;
+      const cleanItm = String(itm).slice(0, 100);
+      let s = 0, d = 0;
+      if (val && typeof val === 'object') {
+        const sn = parseInt(val.storage);
+        const dn = parseInt(val.display);
+        s = isNaN(sn) || sn < 0 ? 0 : sn;
+        d = isNaN(dn) || dn < 0 ? 0 : dn;
+      } else {
+        const n = parseInt(val);
+        s = isNaN(n) || n < 0 ? 0 : n;
+      }
+      result[cleanCat][cleanItm] = { storage: s, display: d };
     }
   }
   return result;
+}
+
+// Reads a stored item value (may be legacy number) into { storage, display }
+function readCountItem(val) {
+  if (val && typeof val === 'object') {
+    return {
+      storage: Math.max(0, Number(val.storage) || 0),
+      display: Math.max(0, Number(val.display) || 0),
+    };
+  }
+  return { storage: Math.max(0, Number(val) || 0), display: 0 };
 }
 
 // ── POST /api/count ────────────────────────────────────────────────────────────
@@ -174,9 +211,12 @@ app.post('/api/count', rateLimit, async (req, res) => {
 });
 
 // ── POST /api/pull ─────────────────────────────────────────────────────────────
+// type='pull'    moves stock from storage → display (total unchanged)
+// type='sale'    removes stock from display (total decreases) — legacy; new UI omits
+// type='receipt' adds stock to storage from an external shipment (total increases)
 app.post('/api/pull', rateLimit, async (req, res) => {
   try {
-    const { facility, category, item, quantity, pulled_by, notes } = req.body;
+    const { facility, category, item, quantity, pulled_by, notes, type } = req.body;
 
     if (!VALID_FACILITIES.includes(facility))
       return res.status(400).json({ error: 'Invalid facility' });
@@ -191,12 +231,15 @@ app.post('/api/pull', rateLimit, async (req, res) => {
       return res.status(400).json({ error: 'Invalid category' });
     if (!item || typeof item !== 'string' || item.length > 100)
       return res.status(400).json({ error: 'Invalid item' });
+    const eventType = type || 'sale';
+    if (!['pull', 'sale', 'receipt'].includes(eventType))
+      return res.status(400).json({ error: 'Invalid type' });
 
     const cleanNotes = notes ? String(notes).trim().slice(0, 500) : null;
 
     await db.execute({
-      sql: `INSERT INTO inventory_pulls (facility, category, item, quantity, pulled_by, notes) VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [facility, category, item, qty, pulled_by.trim(), cleanNotes]
+      sql: `INSERT INTO inventory_pulls (facility, category, item, quantity, pulled_by, notes, type) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [facility, category, item, qty, pulled_by.trim(), cleanNotes, eventType]
     });
 
     res.json({ success: true });
@@ -207,6 +250,15 @@ app.post('/api/pull', rateLimit, async (req, res) => {
 });
 
 // ── Inventory state helper ─────────────────────────────────────────────────────
+// Adds a delta to the storage/display/total of a nested map entry
+function bumpEstimate(est, cat, itm, dStorage, dDisplay) {
+  if (!est[cat]) est[cat] = {};
+  if (!est[cat][itm]) est[cat][itm] = { storage: 0, display: 0, total: 0 };
+  est[cat][itm].storage = Math.max(0, est[cat][itm].storage + dStorage);
+  est[cat][itm].display = Math.max(0, est[cat][itm].display + dDisplay);
+  est[cat][itm].total   = est[cat][itm].storage + est[cat][itm].display;
+}
+
 async function getInventoryState(facility) {
   const [bwRows, moRows] = await Promise.all([
     db.execute({
@@ -242,19 +294,13 @@ async function getInventoryState(facility) {
         const estimated  = {};
         for (const row of trInOnly.rows) {
           if (!transfersIn[row.category]) transfersIn[row.category] = {};
-          if (!estimated[row.category])   estimated[row.category]   = {};
           transfersIn[row.category][row.item] = Number(row.total);
-          estimated[row.category][row.item]   = Number(row.total);
+          bumpEstimate(estimated, row.category, row.item, Number(row.total), 0);
         }
-        const alerts = [];
-        for (const [cat, thresholds] of Object.entries(ALERT_THRESHOLDS)) {
-          if (!estimated[cat]) continue;
-          for (const [itm, threshold] of Object.entries(thresholds)) {
-            if (estimated[cat][itm] !== undefined && estimated[cat][itm] <= threshold)
-              alerts.push({ category: cat, item: itm, threshold, current: estimated[cat][itm] });
-          }
-        }
-        state[type] = { last_count: null, pulls_since: {}, transfers_out: {}, transfers_in: transfersIn, estimated, alerts };
+        state[type] = {
+          last_count: null, pulls_since: {}, sales_since: {},
+          transfers_out: {}, transfers_in: transfersIn, estimated, alerts: []
+        };
       }
       continue;
     }
@@ -271,9 +317,9 @@ async function getInventoryState(facility) {
 
     const [pullRows, trOutRows, trInRows] = await Promise.all([
       db.execute({
-        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_pulls
+        sql: `SELECT category, item, type, SUM(quantity) as total FROM inventory_pulls
               WHERE facility = ? AND category IN (${catPlaceholders}) AND pulled_at > ?
-              GROUP BY category, item`,
+              GROUP BY category, item, type`,
         args: [facility, ...categories, count.submitted_at]
       }),
       db.execute({
@@ -290,10 +336,15 @@ async function getInventoryState(facility) {
       }),
     ]);
 
-    const pullsSince = {};
+    const pullsSince    = {};  // type='pull':    storage → display (total unchanged)
+    const salesSince    = {};  // type='sale':    display → out     (total decreases)
+    const receiptsSince = {};  // type='receipt': external → storage (total increases)
     for (const row of pullRows.rows) {
-      if (!pullsSince[row.category]) pullsSince[row.category] = {};
-      pullsSince[row.category][row.item] = Number(row.total);
+      const bucket = row.type === 'pull'    ? pullsSince
+                   : row.type === 'receipt' ? receiptsSince
+                                            : salesSince;
+      if (!bucket[row.category]) bucket[row.category] = {};
+      bucket[row.category][row.item] = Number(row.total);
     }
 
     const transfersOut = {};
@@ -308,31 +359,48 @@ async function getInventoryState(facility) {
       transfersIn[row.category][row.item] = Number(row.total);
     }
 
-    const estimated = JSON.parse(JSON.stringify(items));
-    for (const [cat, subItems] of Object.entries(pullsSince)) {
-      for (const [itm, qty] of Object.entries(subItems)) {
-        if (estimated[cat]?.[itm] !== undefined)
-          estimated[cat][itm] = Math.max(0, estimated[cat][itm] - qty);
-      }
-    }
-    for (const [cat, subItems] of Object.entries(transfersOut)) {
-      for (const [itm, qty] of Object.entries(subItems)) {
-        if (estimated[cat]?.[itm] !== undefined)
-          estimated[cat][itm] = Math.max(0, estimated[cat][itm] - qty);
-      }
-    }
-    for (const [cat, subItems] of Object.entries(transfersIn)) {
-      for (const [itm, qty] of Object.entries(subItems)) {
-        if (!estimated[cat]) estimated[cat] = {};
-        estimated[cat][itm] = (estimated[cat][itm] ?? 0) + qty;
+    // Normalize the stored count into { storage, display } for every item
+    const normalizedItems = {};
+    const estimated = {};
+    for (const [cat, subItems] of Object.entries(items)) {
+      if (typeof subItems !== 'object' || subItems === null) continue;
+      normalizedItems[cat] = {};
+      for (const [itm, val] of Object.entries(subItems)) {
+        const { storage, display } = readCountItem(val);
+        normalizedItems[cat][itm] = { storage, display };
+        bumpEstimate(estimated, cat, itm, storage, display);
       }
     }
 
+    // Apply movements (seed any cats/items not present in count with a zero baseline)
+    const seedFrom = (bucket) => {
+      for (const [cat, subItems] of Object.entries(bucket)) {
+        for (const itm of Object.keys(subItems)) {
+          if (!estimated[cat]?.[itm]) bumpEstimate(estimated, cat, itm, 0, 0);
+        }
+      }
+    };
+    seedFrom(pullsSince); seedFrom(salesSince); seedFrom(receiptsSince);
+    seedFrom(transfersOut); seedFrom(transfersIn);
+
+    for (const [cat, subItems] of Object.entries(pullsSince))
+      for (const [itm, qty] of Object.entries(subItems)) bumpEstimate(estimated, cat, itm, -qty,  qty);
+    for (const [cat, subItems] of Object.entries(salesSince))
+      for (const [itm, qty] of Object.entries(subItems)) bumpEstimate(estimated, cat, itm,  0,   -qty);
+    for (const [cat, subItems] of Object.entries(receiptsSince))
+      for (const [itm, qty] of Object.entries(subItems)) bumpEstimate(estimated, cat, itm,  qty,  0);
+    for (const [cat, subItems] of Object.entries(transfersOut))
+      for (const [itm, qty] of Object.entries(subItems)) bumpEstimate(estimated, cat, itm, -qty,  0);
+    for (const [cat, subItems] of Object.entries(transfersIn))
+      for (const [itm, qty] of Object.entries(subItems)) bumpEstimate(estimated, cat, itm,  qty,  0);
+
     state[type] = {
-      last_count: { date: count.submitted_at, submitted_by: count.submitted_by, items },
-      pulls_since: pullsSince,
-      transfers_out: transfersOut,
-      transfers_in: transfersIn,
+      last_count: { date: count.submitted_at, submitted_by: count.submitted_by, items: normalizedItems },
+      pulls_since:    pullsSince,
+      sales_since:    salesSince,
+      receipts_since: receiptsSince,
+      transfers_out:  transfersOut,
+      transfers_in:   transfersIn,
       estimated,
       alerts: []  // alerts are computed on combined totals only
     };
@@ -361,20 +429,24 @@ app.get('/api/inventory', requireAdmin, async (req, res) => {
         hasData = true;
         for (const [cat, itms] of Object.entries(s.estimated)) {
           if (!totalEst[cat]) totalEst[cat] = {};
-          for (const [itm, qty] of Object.entries(itms)) {
-            totalEst[cat][itm] = (totalEst[cat][itm] || 0) + qty;
+          for (const [itm, vals] of Object.entries(itms)) {
+            if (!totalEst[cat][itm]) totalEst[cat][itm] = { storage: 0, display: 0, total: 0 };
+            totalEst[cat][itm].storage += vals.storage;
+            totalEst[cat][itm].display += vals.display;
+            totalEst[cat][itm].total   += vals.total;
           }
         }
       }
 
       if (hasData) {
-        // Alerts fire on combined totals across all facilities
+        // Alerts fire on combined totals (storage + display) across all facilities
         const combinedAlerts = [];
         for (const [cat, thresholds] of Object.entries(ALERT_THRESHOLDS)) {
           if (!totalEst[cat]) continue;
           for (const [itm, threshold] of Object.entries(thresholds)) {
-            if (totalEst[cat][itm] !== undefined && totalEst[cat][itm] <= threshold)
-              combinedAlerts.push({ category: cat, item: itm, threshold, current: totalEst[cat][itm] });
+            const cur = totalEst[cat][itm];
+            if (cur !== undefined && cur.total <= threshold)
+              combinedAlerts.push({ category: cat, item: itm, threshold, current: cur.total });
           }
         }
         combined[type] = { estimated: totalEst, alerts: combinedAlerts };
@@ -488,6 +560,183 @@ app.get('/api/transfers', requireAdmin, async (req, res) => {
     res.json(rows.rows);
   } catch (err) {
     console.error('GET /api/transfers:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── GET /api/reconcile ─────────────────────────────────────────────────────────
+// Returns the last two counts for a facility+count_type plus movements in between,
+// for comparing against POS-reported sales.
+app.get('/api/reconcile', requireAdmin, async (req, res) => {
+  try {
+    const { facility, count_type } = req.query;
+    if (!VALID_FACILITIES.includes(facility))
+      return res.status(400).json({ error: 'Invalid facility' });
+    if (!['biweekly', 'monthly'].includes(count_type))
+      return res.status(400).json({ error: 'Invalid count type' });
+
+    const countsRes = await db.execute({
+      sql: `SELECT id, submitted_at, submitted_by, items FROM inventory_counts
+            WHERE facility = ? AND count_type = ? ORDER BY submitted_at DESC LIMIT 2`,
+      args: [facility, count_type]
+    });
+
+    if (countsRes.rows.length < 2) {
+      return res.json({
+        facility, count_type,
+        previous: null,
+        current: countsRes.rows[0] ? {
+          id: countsRes.rows[0].id,
+          date: countsRes.rows[0].submitted_at,
+          submitted_by: countsRes.rows[0].submitted_by,
+        } : null,
+        message: 'Need at least two counts to reconcile.',
+      });
+    }
+
+    const [curr, prev] = countsRes.rows;
+
+    const normalizeItems = (raw) => {
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch (e) { return {}; }
+      const out = {};
+      for (const [cat, subItems] of Object.entries(parsed || {})) {
+        if (typeof subItems !== 'object' || subItems === null) continue;
+        out[cat] = {};
+        for (const [itm, val] of Object.entries(subItems)) {
+          const { storage, display } = readCountItem(val);
+          out[cat][itm] = { storage, display, total: storage + display };
+        }
+      }
+      return out;
+    };
+
+    const prevItems = normalizeItems(prev.items);
+    const currItems = normalizeItems(curr.items);
+
+    const [trInRows, trOutRows, saleRows, receiptRows, posRow] = await Promise.all([
+      db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_transfers
+              WHERE to_facility = ? AND transferred_at > ? AND transferred_at <= ?
+              GROUP BY category, item`,
+        args: [facility, prev.submitted_at, curr.submitted_at]
+      }),
+      db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_transfers
+              WHERE from_facility = ? AND transferred_at > ? AND transferred_at <= ?
+              GROUP BY category, item`,
+        args: [facility, prev.submitted_at, curr.submitted_at]
+      }),
+      db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_pulls
+              WHERE facility = ? AND type = 'sale' AND pulled_at > ? AND pulled_at <= ?
+              GROUP BY category, item`,
+        args: [facility, prev.submitted_at, curr.submitted_at]
+      }),
+      db.execute({
+        sql: `SELECT category, item, SUM(quantity) as total FROM inventory_pulls
+              WHERE facility = ? AND type = 'receipt' AND pulled_at > ? AND pulled_at <= ?
+              GROUP BY category, item`,
+        args: [facility, prev.submitted_at, curr.submitted_at]
+      }),
+      db.execute({
+        sql: `SELECT pos_sales, entered_by, entered_at FROM pos_reconciliations WHERE count_id = ?`,
+        args: [curr.id]
+      }),
+    ]);
+
+    const bucketize = (rows) => {
+      const out = {};
+      for (const r of rows) {
+        if (!out[r.category]) out[r.category] = {};
+        out[r.category][r.item] = Number(r.total);
+      }
+      return out;
+    };
+
+    let posSales = {}, posEnteredBy = null, posEnteredAt = null;
+    if (posRow.rows.length) {
+      try { posSales = JSON.parse(posRow.rows[0].pos_sales) || {}; } catch (e) {}
+      posEnteredBy = posRow.rows[0].entered_by;
+      posEnteredAt = posRow.rows[0].entered_at;
+    }
+
+    res.json({
+      facility,
+      count_type,
+      previous: {
+        id: prev.id,
+        date: prev.submitted_at,
+        submitted_by: prev.submitted_by,
+        items: prevItems,
+      },
+      current: {
+        id: curr.id,
+        date: curr.submitted_at,
+        submitted_by: curr.submitted_by,
+        items: currItems,
+      },
+      transfers_in:  bucketize(trInRows.rows),
+      transfers_out: bucketize(trOutRows.rows),
+      app_sales:     bucketize(saleRows.rows),
+      receipts:      bucketize(receiptRows.rows),
+      pos_sales:     posSales,
+      pos_entered_by: posEnteredBy,
+      pos_entered_at: posEnteredAt,
+    });
+  } catch (err) {
+    console.error('GET /api/reconcile:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── POST /api/reconcile ────────────────────────────────────────────────────────
+// Save (upsert) POS-reported sold quantities keyed to the "current" count_id
+app.post('/api/reconcile', requireAdmin, async (req, res) => {
+  try {
+    const { count_id, pos_sales, entered_by } = req.body;
+    const cid = parseInt(count_id);
+    if (!cid || cid < 1) return res.status(400).json({ error: 'Invalid count_id' });
+    if (!pos_sales || typeof pos_sales !== 'object')
+      return res.status(400).json({ error: 'Invalid pos_sales' });
+
+    // Verify the count exists
+    const existsRes = await db.execute({
+      sql: `SELECT id FROM inventory_counts WHERE id = ?`,
+      args: [cid]
+    });
+    if (!existsRes.rows.length)
+      return res.status(404).json({ error: 'Count not found' });
+
+    // Clean the pos_sales object: { category: { item: non-negative int } }
+    const clean = {};
+    for (const [cat, subItems] of Object.entries(pos_sales)) {
+      if (typeof subItems !== 'object' || subItems === null) continue;
+      const catKey = String(cat).slice(0, 50);
+      const inner = {};
+      for (const [itm, val] of Object.entries(subItems)) {
+        const n = parseInt(val);
+        if (!isNaN(n) && n >= 0) inner[String(itm).slice(0, 100)] = n;
+      }
+      if (Object.keys(inner).length) clean[catKey] = inner;
+    }
+
+    const name = (entered_by && typeof entered_by === 'string')
+      ? entered_by.trim().slice(0, 100) : null;
+
+    await db.execute({
+      sql: `INSERT INTO pos_reconciliations (count_id, pos_sales, entered_by)
+            VALUES (?, ?, ?)
+            ON CONFLICT(count_id) DO UPDATE SET
+              pos_sales = excluded.pos_sales,
+              entered_by = excluded.entered_by,
+              entered_at = CURRENT_TIMESTAMP`,
+      args: [cid, JSON.stringify(clean), name]
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/reconcile:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

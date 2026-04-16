@@ -30,7 +30,7 @@
     header .header-text h1 { font-size: 20px; font-weight: 700; }
     header .header-text p  { font-size: 13px; opacity: .8; margin-top: 2px; }
 
-    main { max-width: 520px; margin: 0 auto; padding: 16px; }
+    main { max-width: 560px; margin: 0 auto; padding: 16px; }
 
     .card {
       background: #fff;
@@ -50,7 +50,39 @@
       border-bottom: 2px solid #e8f0ea;
     }
 
-    /* Facility buttons */
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #1e3a8a;
+      line-height: 1.45;
+    }
+    .info-box strong { font-weight: 700; }
+
+    /* Column headers */
+    .col-headers {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 0 8px;
+      border-bottom: 1px solid #f0f0f0;
+      margin-bottom: 4px;
+    }
+    .col-headers .spacer { flex: 1 1 auto; }
+    .col-headers .col-labels { display: flex; gap: 8px; flex-shrink: 0; }
+    .col-headers .col-label {
+      width: 128px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
     .facility-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -76,41 +108,42 @@
       color: #fff;
     }
 
-    /* Inventory rows */
     .sub-label {
       font-size: 12px;
       font-weight: 700;
       color: #999;
       text-transform: uppercase;
       letter-spacing: .05em;
-      padding: 10px 0 6px;
+      padding: 12px 0 6px;
     }
     .sub-label:first-child { padding-top: 0; }
 
     .inventory-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 9px 0;
+      gap: 12px;
+      padding: 8px 0;
       border-bottom: 1px solid #f0f0f0;
     }
     .inventory-row:last-child { border-bottom: none; }
-    .inventory-row .inv-label {
+    .inv-label {
+      flex: 1 1 auto;
       font-size: 15px;
-      flex: 1;
-      padding-right: 12px;
+      min-width: 90px;
     }
 
+    .count-pair-group { display: flex; gap: 8px; flex-shrink: 0; }
     .count-control {
       display: flex;
       align-items: center;
       border: 2px solid #d0d0d0;
       border-radius: 10px;
       overflow: hidden;
+      width: 128px;
     }
     .count-btn {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 38px;
       border: none;
       background: #f5f5f5;
       font-size: 20px;
@@ -125,14 +158,15 @@
     }
     .count-btn:active { background: #e0e0e0; }
     .count-display {
-      width: 52px;
+      width: 100%;
       text-align: center;
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
       border: none;
       background: #fff;
-      padding: 0 4px;
+      padding: 0 2px;
       -moz-appearance: textfield;
+      min-width: 0;
     }
     .count-display::-webkit-outer-spin-button,
     .count-display::-webkit-inner-spin-button { -webkit-appearance: none; }
@@ -194,6 +228,13 @@
     }
     .btn-again { background: #2c7a3e; color: #fff; }
     .btn-home  { background: #e8f0ea; color: #2c7a3e; }
+
+    @media (max-width: 460px) {
+      .count-control { width: 108px; }
+      .count-btn { width: 32px; height: 36px; font-size: 18px; }
+      .count-display { font-size: 16px; }
+      .col-headers .col-label { width: 108px; }
+    }
   </style>
 </head>
 <body>
@@ -209,6 +250,10 @@
 <div id="form-area">
 <main>
 
+  <div class="info-box">
+    Count items in <strong>two places</strong>: what's in <strong>Storage</strong> (backroom) and what's out on <strong>Display</strong> (floor). Record each separately.
+  </div>
+
   <!-- FACILITY -->
   <div class="card">
     <h2>Facility</h2>
@@ -220,272 +265,7 @@
     <div class="error-msg" id="err-facility">Please select a facility.</div>
   </div>
 
-  <!-- POLYESTER STRINGS -->
-  <div class="card">
-    <h2>Polyester Strings</h2>
-
-    <div class="sub-label">Head</div>
-    <div class="inventory-row">
-      <span class="inv-label">Hawk Touch</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="hawk_touch">−</button>
-        <input class="count-display" type="number" id="hawk_touch" data-category="reels" data-item="hawk_touch" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="hawk_touch">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Hawk Tour rPET</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="hawk_tour_rpet">−</button>
-        <input class="count-display" type="number" id="hawk_tour_rpet" data-category="reels" data-item="hawk_tour_rpet" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="hawk_tour_rpet">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Hawk Power</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="hawk_power">−</button>
-        <input class="count-display" type="number" id="hawk_power" data-category="reels" data-item="hawk_power" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="hawk_power">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Lynx Tour</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="lynx_tour">−</button>
-        <input class="count-display" type="number" id="lynx_tour" data-category="reels" data-item="lynx_tour" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="lynx_tour">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Lynx Touch</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="lynx_touch">−</button>
-        <input class="count-display" type="number" id="lynx_touch" data-category="reels" data-item="lynx_touch" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="lynx_touch">+</button>
-      </div>
-    </div>
-
-    <div class="sub-label">Babolat</div>
-    <div class="inventory-row">
-      <span class="inv-label">RPM Blast</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="rpm_blast">−</button>
-        <input class="count-display" type="number" id="rpm_blast" data-category="reels" data-item="rpm_blast" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="rpm_blast">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">RPM Rough</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="rpm_rough">−</button>
-        <input class="count-display" type="number" id="rpm_rough" data-category="reels" data-item="rpm_rough" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="rpm_rough">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">RPM Power</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="rpm_power">−</button>
-        <input class="count-display" type="number" id="rpm_power" data-category="reels" data-item="rpm_power" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="rpm_power">+</button>
-      </div>
-    </div>
-
-    <div class="sub-label">Yonex</div>
-    <div class="inventory-row">
-      <span class="inv-label">Polytour Pro Yellow</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_yellow">−</button>
-        <input class="count-display" type="number" id="polytour_pro_yellow" data-category="reels" data-item="polytour_pro_yellow" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_yellow">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Polytour Pro Blue</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_blue">−</button>
-        <input class="count-display" type="number" id="polytour_pro_blue" data-category="reels" data-item="polytour_pro_blue" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_blue">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Polytour Pro Teal</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_teal">−</button>
-        <input class="count-display" type="number" id="polytour_pro_teal" data-category="reels" data-item="polytour_pro_teal" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_teal">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Polytour Pro Purple</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_purple">−</button>
-        <input class="count-display" type="number" id="polytour_pro_purple" data-category="reels" data-item="polytour_pro_purple" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_purple">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Polytour Pro Black</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="polytour_pro_black">−</button>
-        <input class="count-display" type="number" id="polytour_pro_black" data-category="reels" data-item="polytour_pro_black" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="polytour_pro_black">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Polytour Rev</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="polytour_rev">−</button>
-        <input class="count-display" type="number" id="polytour_rev" data-category="reels" data-item="polytour_rev" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="polytour_rev">+</button>
-      </div>
-    </div>
-
-    <div class="sub-label">Tecnifibre</div>
-    <div class="inventory-row">
-      <span class="inv-label">Ice Code</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="ice_code">−</button>
-        <input class="count-display" type="number" id="ice_code" data-category="reels" data-item="ice_code" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="ice_code">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Razor Soft</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="razor_soft">−</button>
-        <input class="count-display" type="number" id="razor_soft" data-category="reels" data-item="razor_soft" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="razor_soft">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SYNTHETIC & NATURAL GUT -->
-  <div class="card">
-    <h2>Synthetic &amp; Natural Gut</h2>
-
-    <div class="sub-label">Head</div>
-    <div class="inventory-row">
-      <span class="inv-label">Synthetic Gut</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="synthetic_gut_head">−</button>
-        <input class="count-display" type="number" id="synthetic_gut_head" data-category="gut_strings" data-item="synthetic_gut_head" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="synthetic_gut_head">+</button>
-      </div>
-    </div>
-
-    <div class="sub-label">Babolat</div>
-    <div class="inventory-row">
-      <span class="inv-label">Synthetic Gut</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="synthetic_gut_babolat">−</button>
-        <input class="count-display" type="number" id="synthetic_gut_babolat" data-category="gut_strings" data-item="synthetic_gut_babolat" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="synthetic_gut_babolat">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Touch VS Natural Gut</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="touch_vs">−</button>
-        <input class="count-display" type="number" id="touch_vs" data-category="gut_strings" data-item="touch_vs" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="touch_vs">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MULTIFILAMENT STRINGS -->
-  <div class="card">
-    <h2>Multifilament Strings</h2>
-
-    <div class="sub-label">Tecnifibre</div>
-    <div class="inventory-row">
-      <span class="inv-label">X-One Biphase</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="x_one_biphase">−</button>
-        <input class="count-display" type="number" id="x_one_biphase" data-category="multifilament" data-item="x_one_biphase" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="x_one_biphase">+</button>
-      </div>
-    </div>
-
-    <div class="sub-label">Head</div>
-    <div class="inventory-row">
-      <span class="inv-label">Velocity MLT</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="velocity_mlt">−</button>
-        <input class="count-display" type="number" id="velocity_mlt" data-category="multifilament" data-item="velocity_mlt" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="velocity_mlt">+</button>
-      </div>
-    </div>
-    <div class="inventory-row">
-      <span class="inv-label">Reflex MLT</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="reflex_mlt">−</button>
-        <input class="count-display" type="number" id="reflex_mlt" data-category="multifilament" data-item="reflex_mlt" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="reflex_mlt">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- BALL CASES -->
-  <div class="card">
-    <h2>Ball Cases</h2>
-
-    <div class="inventory-row">
-      <span class="inv-label">Full Cases</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="full_cases">−</button>
-        <input class="count-display" type="number" id="full_cases" data-category="ball_cases" data-item="full_cases" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="full_cases">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Open Cans (partial cases)</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="open_cans">−</button>
-        <input class="count-display" type="number" id="open_cans" data-category="ball_cases" data-item="open_cans" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="open_cans">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- CONCESSIONS -->
-  <div class="card">
-    <h2>Concessions</h2>
-
-    <div class="inventory-row">
-      <span class="inv-label">Cases of Water</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="water_cases">−</button>
-        <input class="count-display" type="number" id="water_cases" data-category="concessions" data-item="water_cases" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="water_cases">+</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- SUPPLIES -->
-  <div class="card">
-    <h2>Supplies</h2>
-
-    <div class="inventory-row">
-      <span class="inv-label">Toilet Paper</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="toilet_paper">−</button>
-        <input class="count-display" type="number" id="toilet_paper" data-category="supplies" data-item="toilet_paper" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="toilet_paper">+</button>
-      </div>
-    </div>
-
-    <div class="inventory-row">
-      <span class="inv-label">Hand Soap Bottles</span>
-      <div class="count-control">
-        <button type="button" class="count-btn" data-action="dec" data-target="hand_soap">−</button>
-        <input class="count-display" type="number" id="hand_soap" data-category="supplies" data-item="hand_soap" value="0" min="0">
-        <button type="button" class="count-btn" data-action="inc" data-target="hand_soap">+</button>
-      </div>
-    </div>
-  </div>
+  <div id="inventory-cards"></div>
 
   <!-- NAME -->
   <div class="card">
@@ -511,27 +291,134 @@
 </div>
 
 <script>
+  // Schema: each card = a category; items grouped by optional brand sub-label
+  const SCHEMA = [
+    {
+      title: 'Polyester Strings', category: 'reels',
+      groups: [
+        { label: 'Head', items: [
+          ['hawk_touch', 'Hawk Touch'], ['hawk_tour_rpet', 'Hawk Tour rPET'],
+          ['hawk_power', 'Hawk Power'], ['lynx_tour', 'Lynx Tour'], ['lynx_touch', 'Lynx Touch'],
+        ]},
+        { label: 'Babolat', items: [
+          ['rpm_blast', 'RPM Blast'], ['rpm_rough', 'RPM Rough'], ['rpm_power', 'RPM Power'],
+        ]},
+        { label: 'Yonex', items: [
+          ['polytour_pro_yellow', 'Polytour Pro Yellow'], ['polytour_pro_blue', 'Polytour Pro Blue'],
+          ['polytour_pro_teal', 'Polytour Pro Teal'], ['polytour_pro_purple', 'Polytour Pro Purple'],
+          ['polytour_pro_black', 'Polytour Pro Black'], ['polytour_rev', 'Polytour Rev'],
+        ]},
+        { label: 'Tecnifibre', items: [
+          ['ice_code', 'Ice Code'], ['razor_soft', 'Razor Soft'],
+        ]},
+      ],
+    },
+    {
+      title: 'Synthetic &amp; Natural Gut', category: 'gut_strings',
+      groups: [
+        { label: 'Head',    items: [['synthetic_gut_head', 'Synthetic Gut']] },
+        { label: 'Babolat', items: [
+          ['synthetic_gut_babolat', 'Synthetic Gut'],
+          ['touch_vs', 'Touch VS Natural Gut'],
+        ]},
+      ],
+    },
+    {
+      title: 'Multifilament Strings', category: 'multifilament',
+      groups: [
+        { label: 'Tecnifibre', items: [['x_one_biphase', 'X-One Biphase']] },
+        { label: 'Head',       items: [
+          ['velocity_mlt', 'Velocity MLT'],
+          ['reflex_mlt',   'Reflex MLT'],
+        ]},
+      ],
+    },
+    {
+      title: 'Ball Cases', category: 'ball_cases',
+      groups: [
+        { items: [
+          ['full_cases', 'Full Cases'],
+          ['open_cans',  'Open Cans (partial cases)'],
+        ]},
+      ],
+    },
+    {
+      title: 'Concessions', category: 'concessions',
+      groups: [{ items: [['water_cases', 'Cases of Water']] }],
+    },
+    {
+      title: 'Supplies', category: 'supplies',
+      groups: [{ items: [
+        ['toilet_paper', 'Toilet Paper'],
+        ['hand_soap',    'Hand Soap Bottles'],
+      ]}],
+    },
+  ];
+
+  function renderInventoryCards() {
+    const root = document.getElementById('inventory-cards');
+    root.innerHTML = SCHEMA.map(card => `
+      <div class="card">
+        <h2>${card.title}</h2>
+        <div class="col-headers">
+          <div class="spacer"></div>
+          <div class="col-labels">
+            <div class="col-label">Storage</div>
+            <div class="col-label">Display</div>
+          </div>
+        </div>
+        ${card.groups.map(g => `
+          ${g.label ? `<div class="sub-label">${g.label}</div>` : ''}
+          ${g.items.map(([key, name]) => renderRow(card.category, key, name)).join('')}
+        `).join('')}
+      </div>
+    `).join('');
+  }
+
+  function renderRow(cat, key, name) {
+    return `
+      <div class="inventory-row">
+        <div class="inv-label">${name}</div>
+        <div class="count-pair-group">
+          ${renderControl(cat, key, 'storage')}
+          ${renderControl(cat, key, 'display')}
+        </div>
+      </div>`;
+  }
+
+  function renderControl(cat, key, loc) {
+    const id = `${cat}__${key}__${loc}`;
+    return `
+      <div class="count-control">
+        <button type="button" class="count-btn" data-action="dec" data-target="${id}">−</button>
+        <input class="count-display" type="number" inputmode="numeric"
+               id="${id}" data-category="${cat}" data-item="${key}" data-loc="${loc}"
+               value="0" min="0">
+        <button type="button" class="count-btn" data-action="inc" data-target="${id}">+</button>
+      </div>`;
+  }
+
   let selectedFacility = null;
 
-  // Facility buttons
-  document.querySelectorAll('.facility-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.facility-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedFacility = btn.dataset.facility;
-      hide('err-facility');
+  function bindEvents() {
+    document.querySelectorAll('.facility-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.facility-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedFacility = btn.dataset.facility;
+        hide('err-facility');
+      });
     });
-  });
 
-  // Count controls
-  document.querySelectorAll('.count-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const input = document.getElementById(btn.dataset.target);
-      const val = parseInt(input.value) || 0;
-      if (btn.dataset.action === 'inc') input.value = val + 1;
-      if (btn.dataset.action === 'dec') input.value = Math.max(0, val - 1);
+    document.querySelectorAll('.count-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        const val = parseInt(input.value) || 0;
+        if (btn.dataset.action === 'inc') input.value = val + 1;
+        if (btn.dataset.action === 'dec') input.value = Math.max(0, val - 1);
+      });
     });
-  });
+  }
 
   function show(id) { document.getElementById(id).classList.add('visible'); }
   function hide(id) { document.getElementById(id).classList.remove('visible'); }
@@ -541,8 +428,10 @@
     document.querySelectorAll('.count-display[data-category]').forEach(input => {
       const cat = input.dataset.category;
       const itm = input.dataset.item;
-      if (!items[cat]) items[cat] = {};
-      items[cat][itm] = parseInt(input.value) || 0;
+      const loc = input.dataset.loc;
+      if (!items[cat])        items[cat] = {};
+      if (!items[cat][itm])   items[cat][itm] = { storage: 0, display: 0 };
+      items[cat][itm][loc] = parseInt(input.value) || 0;
     });
     return items;
   }
@@ -585,6 +474,9 @@
       btn.textContent = 'Submit Bi-Weekly Count';
     }
   }
+
+  renderInventoryCards();
+  bindEvents();
 </script>
 </body>
 </html>
