@@ -12,8 +12,8 @@ const db = createClient({
 const VALID_FACILITIES = ['SATC', 'Pharr', 'Wilco'];
 
 const COUNT_SCHEDULE = {
-  biweekly: { startDate: '2026-04-23', intervalDays: 14 },
-  monthly:  { startDate: '2026-04-22', intervalDays: 28 },
+  biweekly: { startDate: '2026-04-30', intervalDays: 14 },
+  monthly:  { startDate: '2026-05-06', intervalDays: 28 },
 };
 
 function getScheduleDates(startDate, intervalDays) {
