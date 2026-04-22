@@ -119,6 +119,25 @@ async function initDB() {
   try { await db.execute(`UPDATE inventory_pulls SET type = 'sale' WHERE type IS NULL`); } catch (e) {}
 }
 
+// ── Basic Auth gate (applied to every request) ────────────────────────────────
+app.use((req, res, next) => {
+  const expectedUser = process.env.BASIC_AUTH_USER;
+  const expectedPass = process.env.BASIC_AUTH_PASS;
+  if (!expectedUser || !expectedPass) {
+    return res.status(500).send('Auth not configured');
+  }
+  const header = req.headers.authorization;
+  if (header && header.startsWith('Basic ')) {
+    const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+    const idx = decoded.indexOf(':');
+    const user = decoded.slice(0, idx);
+    const pass = decoded.slice(idx + 1);
+    if (user === expectedUser && pass === expectedPass) return next();
+  }
+  res.set('WWW-Authenticate', 'Basic realm="Rippner Tennis", charset="UTF-8"');
+  res.status(401).send('Authentication required');
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
