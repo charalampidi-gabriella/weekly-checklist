@@ -11,6 +11,11 @@ const db = createClient({
 
 const VALID_FACILITIES = ['SATC', 'Pharr', 'Wilco'];
 
+// Categories whose counts accept 0.5 increments (e.g. half-reel).
+// All other categories are integer-only.
+const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament']);
+const snapHalf = n => Math.round(n * 2) / 2;
+
 const COUNT_SCHEDULE = {
   biweekly: { startDate: '2026-04-30', intervalDays: 14 },
   monthly:  { startDate: '2026-05-06', intervalDays: 28 },
@@ -154,15 +159,6 @@ function rateLimit(req, res, next) {
   next();
 }
 
-// ── Admin key middleware ────────────────────────────────────────────────────────
-function requireAdmin(req, res, next) {
-  const key = req.query.key || req.headers['x-admin-key'];
-  if (!process.env.ADMIN_KEY || key !== process.env.ADMIN_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-}
-
 // Items JSON shape: { category: { item: { storage: N, display: M } } }
 // Accepts legacy shape { category: { item: N } } and normalizes to { storage: N, display: 0 }
 function sanitizeItems(items) {
@@ -171,18 +167,22 @@ function sanitizeItems(items) {
   for (const [cat, subItems] of Object.entries(items)) {
     if (typeof subItems !== 'object' || subItems === null) continue;
     const cleanCat = String(cat).slice(0, 50);
+    const allowDecimal = DECIMAL_CATEGORIES.has(cleanCat);
+    const parse = allowDecimal ? parseFloat : parseInt;
+    const normalize = v => {
+      const n = parse(v);
+      if (isNaN(n) || n < 0) return 0;
+      return allowDecimal ? snapHalf(n) : n;
+    };
     result[cleanCat] = {};
     for (const [itm, val] of Object.entries(subItems)) {
       const cleanItm = String(itm).slice(0, 100);
       let s = 0, d = 0;
       if (val && typeof val === 'object') {
-        const sn = parseInt(val.storage);
-        const dn = parseInt(val.display);
-        s = isNaN(sn) || sn < 0 ? 0 : sn;
-        d = isNaN(dn) || dn < 0 ? 0 : dn;
+        s = normalize(val.storage);
+        d = normalize(val.display);
       } else {
-        const n = parseInt(val);
-        s = isNaN(n) || n < 0 ? 0 : n;
+        s = normalize(val);
       }
       result[cleanCat][cleanItm] = { storage: s, display: d };
     }
@@ -429,7 +429,7 @@ async function getInventoryState(facility) {
 }
 
 // ── GET /api/inventory ─────────────────────────────────────────────────────────
-app.get('/api/inventory', requireAdmin, async (req, res) => {
+app.get('/api/inventory', async (req, res) => {
   try {
     const result = {};
     for (const fac of VALID_FACILITIES) {
@@ -481,7 +481,7 @@ app.get('/api/inventory', requireAdmin, async (req, res) => {
 });
 
 // ── GET /api/pulls ─────────────────────────────────────────────────────────────
-app.get('/api/pulls', requireAdmin, async (req, res) => {
+app.get('/api/pulls', async (req, res) => {
   try {
     const { facility } = req.query;
     const args = [];
@@ -537,7 +537,7 @@ app.post('/api/transfer', rateLimit, async (req, res) => {
 });
 
 // ── GET /api/counts ────────────────────────────────────────────────────────────
-app.get('/api/counts', requireAdmin, async (req, res) => {
+app.get('/api/counts', async (req, res) => {
   try {
     const { facility } = req.query;
     const args = [];
@@ -565,7 +565,7 @@ app.get('/api/schedule', (req, res) => {
 });
 
 // ── GET /api/transfers ─────────────────────────────────────────────────────────
-app.get('/api/transfers', requireAdmin, async (req, res) => {
+app.get('/api/transfers', async (req, res) => {
   try {
     const { facility } = req.query;
     const args = [];
@@ -586,7 +586,7 @@ app.get('/api/transfers', requireAdmin, async (req, res) => {
 // ── GET /api/reconcile ─────────────────────────────────────────────────────────
 // Returns the last two counts for a facility+count_type plus movements in between,
 // for comparing against POS-reported sales.
-app.get('/api/reconcile', requireAdmin, async (req, res) => {
+app.get('/api/reconcile', async (req, res) => {
   try {
     const { facility, count_type } = req.query;
     if (!VALID_FACILITIES.includes(facility))
@@ -711,7 +711,7 @@ app.get('/api/reconcile', requireAdmin, async (req, res) => {
 
 // ── POST /api/reconcile ────────────────────────────────────────────────────────
 // Save (upsert) POS-reported sold quantities keyed to the "current" count_id
-app.post('/api/reconcile', requireAdmin, async (req, res) => {
+app.post('/api/reconcile', async (req, res) => {
   try {
     const { count_id, pos_sales, entered_by } = req.body;
     const cid = parseInt(count_id);

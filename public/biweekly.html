@@ -291,6 +291,9 @@
 </div>
 
 <script>
+  // Categories that accept 0.5 increments in counts (strings). Others are integer-only.
+  const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament']);
+
   // Schema: each card = a category; items grouped by optional brand sub-label
   const SCHEMA = [
     {
@@ -334,17 +337,22 @@
       ],
     },
     {
-      title: 'Ball Cases', category: 'ball_cases',
+      title: 'Ball Cases', category: 'ball_cases', storageOnly: true,
       groups: [
         { items: [
-          ['full_cases', 'Full Cases'],
-          ['open_cans',  'Open Cans (partial cases)'],
+          ['orange', 'Orange'],
+          ['red',    'Red'],
+          ['green',  'Green'],
+          ['yellow', 'Yellow'],
         ]},
       ],
     },
     {
       title: 'Concessions', category: 'concessions',
-      groups: [{ items: [['water_cases', 'Cases of Water']] }],
+      groups: [{ items: [
+        ['water_cases',   'Cases of Water (24 bottles/case)'],
+        ['water_bottles', 'Loose Water Bottles'],
+      ]}],
     },
     {
       title: 'Supplies', category: 'supplies',
@@ -364,34 +372,37 @@
           <div class="spacer"></div>
           <div class="col-labels">
             <div class="col-label">Storage</div>
-            <div class="col-label">Display</div>
+            ${card.storageOnly ? '' : '<div class="col-label">Display</div>'}
           </div>
         </div>
         ${card.groups.map(g => `
           ${g.label ? `<div class="sub-label">${g.label}</div>` : ''}
-          ${g.items.map(([key, name]) => renderRow(card.category, key, name)).join('')}
+          ${g.items.map(([key, name]) => renderRow(card.category, key, name, card.storageOnly)).join('')}
         `).join('')}
       </div>
     `).join('');
   }
 
-  function renderRow(cat, key, name) {
+  function renderRow(cat, key, name, storageOnly) {
     return `
       <div class="inventory-row">
         <div class="inv-label">${name}</div>
         <div class="count-pair-group">
           ${renderControl(cat, key, 'storage')}
-          ${renderControl(cat, key, 'display')}
+          ${storageOnly ? '' : renderControl(cat, key, 'display')}
         </div>
       </div>`;
   }
 
   function renderControl(cat, key, loc) {
     const id = `${cat}__${key}__${loc}`;
+    const decimal = DECIMAL_CATEGORIES.has(cat);
+    const step = decimal ? '0.5' : '1';
+    const mode = decimal ? 'decimal' : 'numeric';
     return `
       <div class="count-control">
         <button type="button" class="count-btn" data-action="dec" data-target="${id}">−</button>
-        <input class="count-display" type="number" inputmode="numeric"
+        <input class="count-display" type="number" inputmode="${mode}" step="${step}"
                id="${id}" data-category="${cat}" data-item="${key}" data-loc="${loc}"
                value="0" min="0">
         <button type="button" class="count-btn" data-action="inc" data-target="${id}">+</button>
@@ -413,9 +424,11 @@
     document.querySelectorAll('.count-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const input = document.getElementById(btn.dataset.target);
-        const val = parseInt(input.value) || 0;
-        if (btn.dataset.action === 'inc') input.value = val + 1;
-        if (btn.dataset.action === 'dec') input.value = Math.max(0, val - 1);
+        const decimal = DECIMAL_CATEGORIES.has(input.dataset.category);
+        const step = decimal ? 0.5 : 1;
+        const val = parseFloat(input.value) || 0;
+        const next = btn.dataset.action === 'inc' ? val + step : Math.max(0, val - step);
+        input.value = decimal ? (Math.round(next * 2) / 2) : Math.round(next);
       });
     });
   }
@@ -431,7 +444,8 @@
       const loc = input.dataset.loc;
       if (!items[cat])        items[cat] = {};
       if (!items[cat][itm])   items[cat][itm] = { storage: 0, display: 0 };
-      items[cat][itm][loc] = parseInt(input.value) || 0;
+      const raw = DECIMAL_CATEGORIES.has(cat) ? parseFloat(input.value) : parseInt(input.value);
+      items[cat][itm][loc] = raw || 0;
     });
     return items;
   }

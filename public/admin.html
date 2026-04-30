@@ -27,40 +27,6 @@
     .back-btn { color: rgba(255,255,255,.85); text-decoration: none; font-size: 22px; line-height: 1; }
     header h1 { font-size: 20px; font-weight: 700; }
 
-    #key-prompt {
-      background: #fff;
-      border-radius: 14px;
-      padding: 40px 24px;
-      max-width: 400px;
-      margin: 40px auto;
-      text-align: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,.1);
-    }
-    #key-prompt h2 { font-size: 20px; margin-bottom: 8px; }
-    #key-prompt p  { color: #666; font-size: 14px; margin-bottom: 20px; }
-    #key-prompt input {
-      width: 100%;
-      border: 2px solid #d0d0d0;
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 16px;
-      font-family: inherit;
-      outline: none;
-      margin-bottom: 12px;
-    }
-    #key-prompt input:focus { border-color: #2c7a3e; }
-    #key-prompt button {
-      width: 100%;
-      background: #2c7a3e;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 14px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
     main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
 
     /* Alert banner */
@@ -492,14 +458,7 @@
   </div>
 </header>
 
-<div id="key-prompt" style="display:none">
-  <h2>Admin Access</h2>
-  <p>Enter your admin key to view the inventory dashboard.</p>
-  <input type="password" id="key-input" placeholder="Admin key" onkeydown="if(event.key==='Enter')enterKey()">
-  <button onclick="enterKey()">View Dashboard</button>
-</div>
-
-<main id="main-area" style="display:none">
+<main id="main-area">
   <div class="alert-banner" id="alert-banner">
     <h3>Low Stock Alerts</h3>
     <div class="alert-chips" id="alert-chips"></div>
@@ -557,23 +516,28 @@
     },
     ball_cases: {
       label: 'Ball Cases',
-      items: { full_cases: 'Full Cases', open_cans: 'Open Cans' }
+      items: { orange: 'Orange', red: 'Red', green: 'Green', yellow: 'Yellow' }
     },
     concessions: {
       label: 'Concessions',
-      items: { water_cases: 'Cases of Water' }
+      items: { water_cases: 'Cases of Water (24/case)', water_bottles: 'Loose Water Bottles' }
     },
     supplies: {
       label: 'Supplies',
       items: { toilet_paper: 'Toilet Paper', hand_soap: 'Hand Soap Bottles' }
     },
     prime_tour_grips: {
-      label: 'Prime Tour Grips',
-      items: { white: 'White', black: 'Black', pink: 'Pink', blue: 'Blue' }
+      label: 'Prime Tour Grips (3 grips/packet)',
+      items: {
+        white_packets: 'White — Packets', white: 'White — Loose Grips',
+        black_packets: 'Black — Packets', black: 'Black — Loose Grips',
+        pink_packets:  'Pink — Packets',  pink:  'Pink — Loose Grips',
+        blue_packets:  'Blue — Packets',  blue:  'Blue — Loose Grips',
+      }
     },
     pro_grips: {
-      label: 'Pro Grips',
-      items: { total: 'Pro Grips (total)' }
+      label: 'Pro Grips (3 grips/packet)',
+      items: { total: 'Packets' }
     },
     wristbands: {
       label: 'Wristbands',
@@ -599,17 +563,6 @@
   const BIWEEKLY_CATS  = ['reels', 'gut_strings', 'multifilament', 'ball_cases', 'concessions', 'supplies'];
   const MONTHLY_CATS   = ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
 
-  // Load key from sessionStorage; if it was in the URL, save it and strip it
-  let ADMIN_KEY = sessionStorage.getItem('adminKey') || '';
-  const _urlKey = new URLSearchParams(location.search).get('key');
-  if (_urlKey) {
-    ADMIN_KEY = _urlKey;
-    sessionStorage.setItem('adminKey', _urlKey);
-    const _clean = new URL(location.href);
-    _clean.searchParams.delete('key');
-    history.replaceState(null, '', _clean.toString());
-  }
-
   let inventoryData = null;
   let allPulls = [];
   let allTransfers = [];
@@ -624,39 +577,15 @@
   let reconcileType     = 'biweekly';
   let reconcileData     = null;
 
-  function apiFetch(url) {
-    return fetch(url, { headers: { 'x-admin-key': ADMIN_KEY } });
-  }
-
-  // ── Auth ────────────────────────────────────────────────────────────────────
-  function enterKey() {
-    const k = document.getElementById('key-input').value.trim();
-    if (k) {
-      ADMIN_KEY = k;
-      sessionStorage.setItem('adminKey', k);
-      init();
-    }
-  }
-
   async function init() {
-    document.getElementById('key-prompt').style.display = 'none';
-    document.getElementById('main-area').style.display = 'block';
-
     try {
       const [invRes, pullRes, transRes, schedRes, countsRes] = await Promise.all([
-        apiFetch('/api/inventory'),
-        apiFetch('/api/pulls'),
-        apiFetch('/api/transfers'),
+        fetch('/api/inventory'),
+        fetch('/api/pulls'),
+        fetch('/api/transfers'),
         fetch('/api/schedule'),
-        apiFetch('/api/counts'),
+        fetch('/api/counts'),
       ]);
-
-      if (invRes.status === 401) {
-        document.getElementById('main-area').style.display = 'none';
-        document.getElementById('key-prompt').style.display = 'block';
-        document.getElementById('key-prompt').innerHTML += '<p style="color:#c0392b;margin-top:8px">Invalid admin key.</p>';
-        return;
-      }
 
       inventoryData = await invRes.json();
       allPulls = await pullRes.json();
@@ -762,6 +691,9 @@
 
       rows += `<tr class="cat-header"><td colspan="6">${catDef.label}</td></tr>`;
 
+      let waterCases = 0, waterBottles = 0;
+      const gripTotals = {};  // color → { packets, loose }
+
       for (const [itemKey, itemName] of Object.entries(catDef.items)) {
         const counted  = readLastCount(state?.last_count?.items?.[cat]?.[itemKey]);
         const pulled   = state?.pulls_since?.[cat]?.[itemKey]    || 0;
@@ -812,6 +744,41 @@
           <td>${actStr}</td>
           <td>${statusHtml}</td>
         </tr>`;
+
+        if (cat === 'concessions' && est) {
+          if (itemKey === 'water_cases')   waterCases   = est.total;
+          if (itemKey === 'water_bottles') waterBottles = est.total;
+        }
+
+        if (cat === 'prime_tour_grips' && est) {
+          const isPacket = itemKey.endsWith('_packets');
+          const color = isPacket ? itemKey.slice(0, -'_packets'.length) : itemKey;
+          if (!gripTotals[color]) gripTotals[color] = { packets: 0, loose: 0 };
+          gripTotals[color][isPacket ? 'packets' : 'loose'] = est.total;
+        }
+        if (cat === 'pro_grips' && est && itemKey === 'total') {
+          gripTotals.pro = { packets: est.total, loose: 0 };
+        }
+      }
+
+      if (cat === 'concessions' && (waterCases || waterBottles)) {
+        const totalBottles = waterCases * 24 + waterBottles;
+        rows += `<tr><td colspan="6" style="text-align:right;font-size:12px;color:#555;padding:6px 12px;background:#fafafa">
+          ≈ <strong>${totalBottles}</strong> total bottles (${waterCases} × 24 + ${waterBottles})
+        </td></tr>`;
+      }
+
+      if (cat === 'prime_tour_grips' || cat === 'pro_grips') {
+        for (const [color, t] of Object.entries(gripTotals)) {
+          if (!t.packets && !t.loose) continue;
+          const totalGrips = t.packets * 3 + t.loose;
+          const colorLabel = cat === 'pro_grips'
+            ? 'Pro Grips'
+            : color.charAt(0).toUpperCase() + color.slice(1);
+          rows += `<tr><td colspan="6" style="text-align:right;font-size:12px;color:#555;padding:6px 12px;background:#fafafa">
+            ${colorLabel}: ≈ <strong>${totalGrips}</strong> total grips (${t.packets} × 3 + ${t.loose})
+          </td></tr>`;
+        }
       }
     }
 
@@ -1140,7 +1107,7 @@
     const container = document.getElementById('tab-reconcile');
     container.innerHTML = renderReconcileShell() + '<div class="loading">Loading reconciliation...</div>';
     try {
-      const res = await apiFetch(`/api/reconcile?facility=${reconcileFacility}&count_type=${reconcileType}`);
+      const res = await fetch(`/api/reconcile?facility=${reconcileFacility}&count_type=${reconcileType}`);
       reconcileData = await res.json();
       renderReconcileTab();
     } catch (e) {
@@ -1325,7 +1292,7 @@
     try {
       const res = await fetch('/api/reconcile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           count_id: reconcileData.current.id,
           pos_sales: payload,
@@ -1364,11 +1331,7 @@
   }
 
   // ── Boot ─────────────────────────────────────────────────────────────────────
-  if (ADMIN_KEY) {
-    init();
-  } else {
-    document.getElementById('key-prompt').style.display = 'block';
-  }
+  init();
 </script>
 </body>
 </html>
