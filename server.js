@@ -51,14 +51,13 @@ function getScheduleDates(startDate, intervalDays) {
   };
 }
 
-// Alert thresholds: item is "low" when count is AT or BELOW this number
+// Alert thresholds: item is "low" when its combined-facility total is AT or BELOW this number
 const ALERT_THRESHOLDS = {
   reels: {
     hawk_touch: 3, hawk_tour_rpet: 3, hawk_power: 3,
     lynx_tour: 3, lynx_touch: 3,
-    rpm_blast: 3, rpm_rough: 3, rpm_power: 3,
-    polytour_pro_yellow: 2, polytour_pro_blue: 2, polytour_pro_teal: 2,
-    polytour_pro_purple: 2, polytour_pro_black: 2, polytour_rev: 2,
+    rpm_blast_16g: 3, rpm_blast_17g: 3, rpm_rough: 3, rpm_power: 3,
+    polytour_rev: 2,
     ice_code: 2, razor_soft: 2,
   },
   gut_strings: {
@@ -70,6 +69,17 @@ const ALERT_THRESHOLDS = {
   prime_tour_grips: { white: 15, black: 15, pink: 15, blue: 15 },
   pro_grips: { total: 20 },
 };
+
+// Group alerts: fire when the SUM of these items' combined-facility totals is AT or BELOW threshold.
+// Use this when colors/variants of the same product should be tracked as one stock pool for restocking.
+const GROUP_ALERT_THRESHOLDS = [
+  {
+    category: 'reels',
+    label: 'Polytour Pro (all colors)',
+    items: ['polytour_pro_yellow', 'polytour_pro_blue', 'polytour_pro_teal', 'polytour_pro_purple', 'polytour_pro_black'],
+    threshold: 1,  // alert when combined total < 2 (i.e. ≤ 1)
+  },
+];
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 async function initDB() {
@@ -467,6 +477,17 @@ app.get('/api/inventory', async (req, res) => {
             if (cur !== undefined && cur.total <= threshold)
               combinedAlerts.push({ category: cat, item: itm, threshold, current: cur.total });
           }
+        }
+        // Group alerts: sum items across the group, threshold against the sum
+        for (const g of GROUP_ALERT_THRESHOLDS) {
+          if (!totalEst[g.category]) continue;
+          let sum = 0;
+          for (const itm of g.items) {
+            const cur = totalEst[g.category][itm];
+            if (cur !== undefined) sum += cur.total;
+          }
+          if (sum <= g.threshold)
+            combinedAlerts.push({ category: g.category, item: g.label, group: true, items: g.items, threshold: g.threshold, current: sum });
         }
         combined[type] = { estimated: totalEst, alerts: combinedAlerts };
       }
