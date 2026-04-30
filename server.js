@@ -57,11 +57,10 @@ const ALERT_THRESHOLDS = {
     hawk_touch: 3, hawk_tour_rpet: 3, hawk_power: 3,
     lynx_tour: 3, lynx_touch: 3,
     rpm_blast_16g: 3, rpm_blast_17g: 3, rpm_rough: 3, rpm_power: 3,
-    polytour_rev: 2,
     ice_code: 2, razor_soft: 2,
   },
   gut_strings: {
-    synthetic_gut_head: 2, synthetic_gut_babolat: 2, touch_vs: 1,
+    synthetic_gut_head: 2, touch_vs: 1,
   },
   multifilament: {
     x_one_biphase: 2, velocity_mlt: 2, reflex_mlt: 2,
