@@ -362,7 +362,7 @@
       title: 'Supplies', category: 'supplies',
       groups: [{ items: [
         ['toilet_paper', 'Toilet Paper'],
-        ['hand_soap',    'Hand Soap Bottles'],
+        ['hand_soap',    'Hand Soap Bottles', { storageOnly: true }],
       ]}],
     },
   ];
@@ -381,7 +381,7 @@
         </div>
         ${card.groups.map(g => `
           ${g.label ? `<div class="sub-label">${g.label}</div>` : ''}
-          ${g.items.map(([key, name]) => renderRow(card.category, key, name, card.storageOnly)).join('')}
+          ${g.items.map(([key, name, opts]) => renderRow(card.category, key, name, card.storageOnly || opts?.storageOnly)).join('')}
         `).join('')}
       </div>
     `).join('');
