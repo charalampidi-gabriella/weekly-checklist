@@ -12,8 +12,10 @@ const db = createClient({
 const VALID_FACILITIES = ['SATC', 'Pharr', 'Wilco'];
 
 // Categories whose counts accept 0.5 increments (e.g. half-reel).
-// All other categories are integer-only.
+// All other categories are integer-only unless the (category,item) is in DECIMAL_ITEMS.
 const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament']);
+const DECIMAL_ITEMS = new Set(['supplies.hand_soap']);
+const allowsDecimal = (cat, item) => DECIMAL_CATEGORIES.has(cat) || DECIMAL_ITEMS.has(`${cat}.${item}`);
 const snapHalf = n => Math.round(n * 2) / 2;
 
 const COUNT_SCHEDULE = {
@@ -157,16 +159,16 @@ function sanitizeItems(items) {
   for (const [cat, subItems] of Object.entries(items)) {
     if (typeof subItems !== 'object' || subItems === null) continue;
     const cleanCat = String(cat).slice(0, 50);
-    const allowDecimal = DECIMAL_CATEGORIES.has(cleanCat);
-    const parse = allowDecimal ? parseFloat : parseInt;
-    const normalize = v => {
-      const n = parse(v);
-      if (isNaN(n) || n < 0) return 0;
-      return allowDecimal ? snapHalf(n) : n;
-    };
     result[cleanCat] = {};
     for (const [itm, val] of Object.entries(subItems)) {
       const cleanItm = String(itm).slice(0, 100);
+      const allowDecimal = allowsDecimal(cleanCat, cleanItm);
+      const parse = allowDecimal ? parseFloat : parseInt;
+      const normalize = v => {
+        const n = parse(v);
+        if (isNaN(n) || n < 0) return 0;
+        return allowDecimal ? snapHalf(n) : n;
+      };
       let s = 0, d = 0;
       if (val && typeof val === 'object') {
         s = normalize(val.storage);
