@@ -144,9 +144,17 @@
     const thresholds = config.thresholds || {};
     let html = '<div class="card"><h2>Item Thresholds</h2>'
       + '<div class="info-box" style="margin-bottom:10px">Leave a value <strong>blank</strong> to disable that item\'s alert. Set a number to alert when the combined-facility total is at or below it.</div>';
+    // Categories whose alerts are managed entirely by group rules (below) — hide per-item rows.
+    const HIDE_CATEGORIES = new Set(['prime_tour_grips', 'dampeners', 'rackets']);
+    // Within reels, polytour_pro_* are managed by the group alert.
+    const isHiddenItem = (cat, itm) => cat === 'reels' && itm.startsWith('polytour_pro_');
+
     for (const [cat, def] of Object.entries(CATALOG_LABELS)) {
+      if (HIDE_CATEGORIES.has(cat)) continue;
+      const visibleItems = Object.entries(def.items).filter(([itm]) => !isHiddenItem(cat, itm));
+      if (visibleItems.length === 0) continue;
       html += `<div style="margin-top:14px;font-weight:700;font-size:13px;color:#555">${esc(def.label)}</div>`;
-      for (const [itm, name] of Object.entries(def.items)) {
+      for (const [itm, name] of visibleItems) {
         const cur = thresholds[cat] && thresholds[cat][itm] !== undefined ? thresholds[cat][itm] : '';
         html += `
           <div class="row">
@@ -190,7 +198,17 @@
   async function save() {
     if (!config) return;
     const next = JSON.parse(JSON.stringify(config));
-    next.thresholds = {};
+    // Wipe only the categories/items shown in the form; preserve hidden ones (group-managed).
+    const shownPairs = new Set();
+    document.querySelectorAll('input[data-kind="threshold"]').forEach(inp => {
+      shownPairs.add(`${inp.dataset.cat}::${inp.dataset.itm}`);
+    });
+    for (const cat of Object.keys(next.thresholds || {})) {
+      for (const itm of Object.keys(next.thresholds[cat])) {
+        if (shownPairs.has(`${cat}::${itm}`)) delete next.thresholds[cat][itm];
+      }
+      if (Object.keys(next.thresholds[cat]).length === 0) delete next.thresholds[cat];
+    }
 
     document.querySelectorAll('input[data-kind="threshold"]').forEach(inp => {
       if (inp.value === '' || inp.value === null) return; // blank = no alert
