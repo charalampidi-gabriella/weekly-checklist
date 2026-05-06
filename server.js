@@ -287,7 +287,7 @@ async function getInventoryState(facility) {
   for (const [type, rows] of [['biweekly', bwRows.rows], ['monthly', moRows.rows]]) {
     const categories = type === 'biweekly'
       ? ['reels', 'gut_strings', 'multifilament', 'ball_cases', 'concessions', 'supplies']
-      : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'rackets'];
+      : ['prime_tour_grips', 'pro_grips', 'wristbands', 'headbands', 'hats', 'dampeners', 'rackets'];
     const catPlaceholders = categories.map(() => '?').join(',');
 
     // No count yet — still show any transfers received so far
