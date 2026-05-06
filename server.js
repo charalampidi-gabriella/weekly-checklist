@@ -1030,7 +1030,8 @@ function getCentralParts(now = new Date()) {
 async function maybeSendWeeklyAlertEmail() {
   try {
     const ct = getCentralParts();
-    if (ct.weekday !== 'Fri' || ct.hour !== 9 || ct.minute > 9) return;
+    // GitHub Actions cron has up to ~10 min drift; widen to the full 9:00–9:59 CT hour
+    if (ct.weekday !== 'Fri' || ct.hour !== 9) return;
 
     const r = await db.execute({
       sql: `SELECT value FROM app_config WHERE key = ?`,
@@ -1053,11 +1054,31 @@ async function maybeSendWeeklyAlertEmail() {
   }
 }
 
-// Manual trigger — protected by NOTIFY_TOKEN (Authorization: Bearer <token>)
-app.post('/api/notify/alerts/test', async (req, res) => {
+function checkNotifyAuth(req, res) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/, '');
-  if (!process.env.NOTIFY_TOKEN || token !== process.env.NOTIFY_TOKEN)
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!process.env.NOTIFY_TOKEN || token !== process.env.NOTIFY_TOKEN) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
+
+// Scheduler tick — meant to be called by an external cron (GitHub Actions, cron-job.org).
+// Always safe to call: only sends if it's Friday 9:xx Central and we haven't sent today.
+app.post('/api/notify/alerts/scheduled', async (req, res) => {
+  if (!checkNotifyAuth(req, res)) return;
+  try {
+    await maybeSendWeeklyAlertEmail();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/notify/alerts/scheduled:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  }
+});
+
+// Manual trigger — always sends, ignores schedule + dedup. For testing.
+app.post('/api/notify/alerts/test', async (req, res) => {
+  if (!checkNotifyAuth(req, res)) return;
   try {
     const result = await sendWeeklyAlertEmail();
     res.json(result);

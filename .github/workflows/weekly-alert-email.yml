@@ -1,0 +1,24 @@
+name: Weekly Alert Email
+
+# GitHub Actions cron uses UTC. Friday 9:00 America/Chicago is 14:00 UTC during
+# CDT (Mar–Nov) and 15:00 UTC during CST (Nov–Mar). We fire both; the server
+# only sends if it's actually 9:xx Central, and dedups so the second hit is a no-op.
+on:
+  schedule:
+    - cron: "0 14 * * 5"   # 14:00 UTC Fri = 9:00 CDT
+    - cron: "0 15 * * 5"   # 15:00 UTC Fri = 9:00 CST
+  workflow_dispatch:        # also allow manual run from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST scheduled alert tick
+        run: |
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $NOTIFY_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$APP_URL/api/notify/alerts/scheduled"
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          NOTIFY_TOKEN: ${{ secrets.NOTIFY_TOKEN }}
