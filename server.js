@@ -470,22 +470,16 @@ async function getInventoryState(facility) {
   return state;
 }
 
-// ── GET /api/inventory ─────────────────────────────────────────────────────────
-app.get('/api/inventory', async (req, res) => {
-  try {
-    const result = {};
-    for (const fac of VALID_FACILITIES) {
-      result[fac] = await getInventoryState(fac);
-    }
-
-    // Combined totals across all facilities
-    const combined = { biweekly: null, monthly: null };
-    for (const type of ['biweekly', 'monthly']) {
+// Build the combined-facility view (totals + alerts) from per-facility state.
+// Returns { biweekly, monthly } where each is { estimated, alerts } or null.
+function buildCombinedView(perFacility) {
+  const combined = { biweekly: null, monthly: null };
+  for (const type of ['biweekly', 'monthly']) {
       const totalEst = {};
       let hasData = false;
 
       for (const fac of VALID_FACILITIES) {
-        const s = result[fac][type];
+        const s = perFacility[fac][type];
         if (!s) continue;
         hasData = true;
         for (const [cat, itms] of Object.entries(s.estimated)) {
@@ -530,8 +524,17 @@ app.get('/api/inventory', async (req, res) => {
         combined[type] = { estimated: totalEst, alerts: combinedAlerts };
       }
     }
-    result.combined = combined;
+  return combined;
+}
 
+// ── GET /api/inventory ─────────────────────────────────────────────────────────
+app.get('/api/inventory', async (req, res) => {
+  try {
+    const result = {};
+    for (const fac of VALID_FACILITIES) {
+      result[fac] = await getInventoryState(fac);
+    }
+    result.combined = buildCombinedView(result);
     res.json(result);
   } catch (err) {
     console.error('GET /api/inventory:', err);
@@ -881,8 +884,195 @@ app.post('/api/reconcile', async (req, res) => {
   }
 });
 
+// ── Weekly alert email ─────────────────────────────────────────────────────────
+const nodemailer = require('nodemailer');
+
+// Display labels for the email — keep in sync with public/admin.html CATALOG.
+const ITEM_LABELS = {
+  reels: {
+    hawk_touch: 'Hawk Touch', hawk_tour_rpet: 'Hawk Tour rPET', hawk_power: 'Hawk Power',
+    lynx_tour: 'Lynx Tour', lynx_touch: 'Lynx Touch',
+    rpm_blast_16g: 'RPM Blast 16g', rpm_blast_17g: 'RPM Blast 17g',
+    rpm_rough: 'RPM Rough', rpm_power: 'RPM Power',
+    polytour_pro_yellow: 'Polytour Pro Yellow', polytour_pro_blue: 'Polytour Pro Blue',
+    polytour_pro_teal: 'Polytour Pro Teal', polytour_pro_purple: 'Polytour Pro Purple',
+    polytour_pro_black: 'Polytour Pro Black', polytour_rev: 'Polytour Rev',
+    ice_code: 'Ice Code', razor_soft: 'Razor Soft',
+  },
+  gut_strings: { synthetic_gut_head: 'Head Synthetic Gut', synthetic_gut_babolat: 'Babolat Synthetic Gut', touch_vs: 'Touch VS Natural Gut' },
+  multifilament: { x_one_biphase: 'X-One Biphase', velocity_mlt: 'Velocity MLT', reflex_mlt: 'Reflex MLT' },
+  ball_cases: { orange: 'Orange', red: 'Red', green: 'Green', yellow: 'Yellow' },
+  concessions: { water_cases: 'Cases of Water', water_bottles: 'Loose Water Bottles' },
+  supplies: { toilet_paper: 'Toilet Paper', hand_soap: 'Hand Soap Bottles' },
+  prime_tour_grips: {
+    white_packets: 'White — Packets of 3', white: 'White — Loose',
+    black_packets: 'Black — Packets of 3', black: 'Black — Loose',
+    pink_packets:  'Pink — Packets of 3',  pink:  'Pink — Loose',
+    blue_packets:  'Blue — Packets of 3',  blue:  'Blue — Loose',
+  },
+  pro_grips: { total: 'Pro Grip Packets' },
+  hydrosorb_pro: { black: 'Black', white: 'White' },
+  wristbands: { '2_5in_black': '2.5in Black', '2_5in_white': '2.5in White', '5in_black': '5in Black', '5in_white': '5in White' },
+  headbands: { black: 'Black', white: 'White' },
+  dampeners: { packets: 'Packets of 2', singles: 'Singles' },
+  hats: { total: 'Rippner Nike Hats' },
+};
+const CATEGORY_LABELS = {
+  reels: 'Polyester Strings', gut_strings: 'Synthetic & Natural Gut', multifilament: 'Multifilament',
+  ball_cases: 'Ball Cases', concessions: 'Concessions', supplies: 'Supplies',
+  prime_tour_grips: 'Prime Tour Grips', pro_grips: 'Pro Grips', hydrosorb_pro: 'Hydrosorb Pro',
+  wristbands: 'Wristbands', headbands: 'Headbands', dampeners: 'Dampeners', hats: 'Hats',
+};
+const itemDisplayName = (cat, itm) => ITEM_LABELS[cat]?.[itm] || itm;
+
+function renderAlertEmailHtml(combined) {
+  const sections = [];
+  for (const type of ['biweekly', 'monthly']) {
+    const data = combined[type];
+    if (!data || !data.alerts || data.alerts.length === 0) continue;
+    const rows = data.alerts.map(a => {
+      const name = a.group ? a.item : `${CATEGORY_LABELS[a.category] || a.category} — ${itemDisplayName(a.category, a.item)}`;
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee">${name}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#c0392b">${a.current}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;color:#666">≤ ${a.threshold}</td>
+      </tr>`;
+    }).join('');
+    sections.push(`
+      <h3 style="font-size:15px;color:#1b4458;margin:20px 0 8px">${type === 'biweekly' ? 'Bi-Weekly Items' : 'Monthly Items'}</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr style="background:#f5f7f5;color:#555;text-transform:uppercase;font-size:11px;letter-spacing:.06em">
+          <th style="padding:8px 12px;text-align:left">Item</th>
+          <th style="padding:8px 12px;text-align:right">Total</th>
+          <th style="padding:8px 12px;text-align:right">Order at</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`);
+  }
+
+  if (sections.length === 0) {
+    return `<p style="font-size:15px;color:#2c7a3e">All inventory is above alert thresholds. Nothing to order this week.</p>`;
+  }
+
+  return `
+    <p style="font-size:14px;color:#555;margin-bottom:8px">
+      Combined inventory across SATC, Pharr &amp; Wilco. An item appears here when its total is at or below its alert threshold.
+    </p>
+    ${sections.join('')}
+    <p style="font-size:12px;color:#999;margin-top:20px">
+      Edit thresholds at the dashboard config page.
+    </p>`;
+}
+
+function buildEmailTransport() {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  if (!user || !pass) return null;
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  });
+}
+
+async function sendWeeklyAlertEmail() {
+  const transport = buildEmailTransport();
+  if (!transport) {
+    console.warn('[alerts-email] EMAIL_USER/EMAIL_PASS not set — skipping send');
+    return { sent: false, reason: 'no-credentials' };
+  }
+  const recipient = process.env.ADMIN_EMAIL || 'manager@rippnertennis.com';
+
+  const perFacility = {};
+  for (const fac of VALID_FACILITIES) {
+    perFacility[fac] = await getInventoryState(fac);
+  }
+  const combined = buildCombinedView(perFacility);
+
+  const totalAlerts =
+    (combined.biweekly?.alerts?.length || 0) +
+    (combined.monthly?.alerts?.length  || 0);
+  const subject = totalAlerts > 0
+    ? `Rippner Tennis — ${totalAlerts} low-stock alert${totalAlerts === 1 ? '' : 's'}`
+    : 'Rippner Tennis — weekly inventory: all stocked';
+
+  const html = `<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:640px;margin:0 auto;color:#1a1a1a">
+    <h2 style="color:#1b4458;border-bottom:2px solid #95d600;padding-bottom:8px">Weekly Inventory Alerts</h2>
+    ${renderAlertEmailHtml(combined)}
+  </div>`;
+
+  await transport.sendMail({
+    from: process.env.EMAIL_USER,
+    to: recipient,
+    subject,
+    html,
+  });
+  return { sent: true, recipient, alerts: totalAlerts };
+}
+
+// ── Scheduler: every Friday at 9 AM Central ────────────────────────────────────
+// Render web instances stay warm on paid plans. We check every 5 minutes; if it's
+// Friday 9:00–9:09 America/Chicago and we haven't sent today, send.
+function getCentralParts(now = new Date()) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    weekday: 'short', hour: 'numeric', minute: 'numeric', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(now).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+  return {
+    weekday: parts.weekday, // 'Mon'..'Sun'
+    hour: parseInt(parts.hour),
+    minute: parseInt(parts.minute),
+    dateKey: `${parts.year}-${parts.month}-${parts.day}`,
+  };
+}
+
+async function maybeSendWeeklyAlertEmail() {
+  try {
+    const ct = getCentralParts();
+    if (ct.weekday !== 'Fri' || ct.hour !== 9 || ct.minute > 9) return;
+
+    const r = await db.execute({
+      sql: `SELECT value FROM app_config WHERE key = ?`,
+      args: ['last_alert_email_sent'],
+    });
+    const lastSent = r.rows.length ? r.rows[0].value : null;
+    if (lastSent === ct.dateKey) return; // already sent today
+
+    const result = await sendWeeklyAlertEmail();
+    if (result.sent) {
+      await db.execute({
+        sql: `INSERT INTO app_config (key, value) VALUES (?, ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+        args: ['last_alert_email_sent', ct.dateKey],
+      });
+      console.log(`[alerts-email] Sent to ${result.recipient} (${result.alerts} alerts) for ${ct.dateKey}`);
+    }
+  } catch (err) {
+    console.error('[alerts-email] scheduler error:', err);
+  }
+}
+
+// Manual trigger — protected by NOTIFY_TOKEN (Authorization: Bearer <token>)
+app.post('/api/notify/alerts/test', async (req, res) => {
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/, '');
+  if (!process.env.NOTIFY_TOKEN || token !== process.env.NOTIFY_TOKEN)
+    return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const result = await sendWeeklyAlertEmail();
+    res.json(result);
+  } catch (err) {
+    console.error('POST /api/notify/alerts/test:', err);
+    res.status(500).json({ error: err.message || 'Server error' });
+  }
+});
+
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 initDB()
-  .then(() => app.listen(PORT, () => console.log(`Inventory app running on http://localhost:${PORT}`)))
+  .then(() => {
+    app.listen(PORT, () => console.log(`Inventory app running on http://localhost:${PORT}`));
+    setInterval(maybeSendWeeklyAlertEmail, 5 * 60 * 1000);
+    maybeSendWeeklyAlertEmail();
+  })
   .catch(err => { console.error('DB init failed:', err); process.exit(1); });
