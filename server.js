@@ -885,7 +885,8 @@ app.post('/api/reconcile', async (req, res) => {
 });
 
 // ── Weekly alert email ─────────────────────────────────────────────────────────
-const nodemailer = require('nodemailer');
+// Uses Resend (HTTPS API) because Render's free tier blocks outbound SMTP.
+const { Resend } = require('resend');
 
 // Display labels for the email — keep in sync with public/admin.html CATALOG.
 const ITEM_LABELS = {
@@ -964,29 +965,15 @@ function renderAlertEmailHtml(combined) {
     </p>`;
 }
 
-function buildEmailTransport() {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: { user, pass },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 30000,
-  });
-}
-
 async function sendWeeklyAlertEmail() {
-  const transport = buildEmailTransport();
-  if (!transport) {
-    console.warn('[alerts-email] EMAIL_USER/EMAIL_PASS not set — skipping send');
-    return { sent: false, reason: 'no-credentials' };
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[alerts-email] RESEND_API_KEY not set — skipping send');
+    return { sent: false, reason: 'no-api-key' };
   }
   const recipient = process.env.ADMIN_EMAIL || 'manager@rippnertennis.com';
+  // Default to Resend's sandbox sender; override with EMAIL_FROM once a domain is verified.
+  const fromAddress = process.env.EMAIL_FROM || 'Rippner Tennis <onboarding@resend.dev>';
 
   const perFacility = {};
   for (const fac of VALID_FACILITIES) {
@@ -1006,13 +993,15 @@ async function sendWeeklyAlertEmail() {
     ${renderAlertEmailHtml(combined)}
   </div>`;
 
-  await transport.sendMail({
-    from: process.env.EMAIL_USER,
+  const resend = new Resend(apiKey);
+  const result = await resend.emails.send({
+    from: fromAddress,
     to: recipient,
     subject,
     html,
   });
-  return { sent: true, recipient, alerts: totalAlerts };
+  if (result.error) throw new Error(result.error.message || JSON.stringify(result.error));
+  return { sent: true, recipient, alerts: totalAlerts, id: result.data?.id };
 }
 
 // ── Scheduler: every Friday at 9 AM Central ────────────────────────────────────

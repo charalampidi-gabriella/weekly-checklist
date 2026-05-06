@@ -5,9 +5,9 @@ services:
     buildCommand: npm install
     startCommand: node server.js
     envVars:
-      - key: EMAIL_USER
+      - key: RESEND_API_KEY
         sync: false
-      - key: EMAIL_PASS
+      - key: EMAIL_FROM
         sync: false
       - key: ADMIN_EMAIL
         sync: false
