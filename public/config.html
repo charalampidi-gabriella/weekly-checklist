@@ -82,14 +82,38 @@
     multifilament: { label: 'Multifilament Strings', items: {
       x_one_biphase: 'X-One Biphase', velocity_mlt: 'Velocity MLT', reflex_mlt: 'Reflex MLT',
     }},
-    pro_grips: { label: 'Pro Grips', items: { total: 'Packets' }},
+    ball_cases: { label: 'Ball Cases', items: {
+      orange: 'Orange', red: 'Red', green: 'Green', yellow: 'Yellow',
+    }},
+    concessions: { label: 'Concessions', items: {
+      water_cases: 'Cases of Water (24/case)', water_bottles: 'Loose Water Bottles',
+    }},
+    supplies: { label: 'Supplies', items: {
+      toilet_paper: 'Toilet Paper', hand_soap: 'Hand Soap Bottles',
+    }},
     prime_tour_grips: { label: 'Prime Tour Grips', items: {
       white_packets: 'White — Packets of 3', white: 'White — Loose',
       black_packets: 'Black — Packets of 3', black: 'Black — Loose',
       pink_packets: 'Pink — Packets of 3', pink: 'Pink — Loose',
       blue_packets: 'Blue — Packets of 3', blue: 'Blue — Loose',
     }},
+    pro_grips: { label: 'Pro Grips', items: { total: 'Packets' }},
+    hydrosorb_pro: { label: 'Hydrosorb Pro', items: {
+      black: 'Black', white: 'White',
+    }},
+    wristbands: { label: 'Wristbands', items: {
+      '2_5in_black': '2.5in Black', '2_5in_white': '2.5in White',
+      '5in_black': '5in Black', '5in_white': '5in White',
+    }},
+    headbands: { label: 'Headbands', items: { black: 'Black', white: 'White' }},
     dampeners: { label: 'Dampeners', items: { packets: 'Packets of 2', singles: 'Singles' }},
+    hats: { label: 'Rippner Nike Hats', items: { total: 'Rippner Nike Hats' }},
+    rackets: { label: 'Rackets', items: {
+      boom_2026: 'Boom 2026', speed_2026: 'Speed 2026', speed_2024: 'Speed 2024',
+      speed_legend: 'Speed Legend', gravity: 'Gravity', radical: 'Radical',
+      extreme: 'Extreme', instinct: 'Instinct', prestige: 'Prestige',
+      boom_2024: 'Boom 2024', boom_neon: 'Boom Neon', boom_ashe: 'Boom Ashe',
+    }},
   };
 
   let config = null;
@@ -116,24 +140,24 @@
   function render() {
     const sections = [];
 
-    // Per-item thresholds, grouped by category
-    const cats = Object.keys(config.thresholds || {});
-    if (cats.length) {
-      let html = '<div class="card"><h2>Item Thresholds</h2>';
-      for (const cat of cats) {
-        html += `<div style="margin-top:6px;font-weight:700;font-size:13px;color:#555">${esc(catLabel(cat))}</div>`;
-        for (const [itm, val] of Object.entries(config.thresholds[cat])) {
-          html += `
-            <div class="row">
-              <div class="row-label">${esc(itemLabel(cat, itm))}</div>
-              <input type="number" min="0" step="1" value="${val}"
-                     data-kind="threshold" data-cat="${esc(cat)}" data-itm="${esc(itm)}">
-            </div>`;
-        }
+    // Per-item thresholds — show every catalog item, prefilled with current value (blank = no alert)
+    const thresholds = config.thresholds || {};
+    let html = '<div class="card"><h2>Item Thresholds</h2>'
+      + '<div class="info-box" style="margin-bottom:10px">Leave a value <strong>blank</strong> to disable that item\'s alert. Set a number to alert when the combined-facility total is at or below it.</div>';
+    for (const [cat, def] of Object.entries(CATALOG_LABELS)) {
+      html += `<div style="margin-top:14px;font-weight:700;font-size:13px;color:#555">${esc(def.label)}</div>`;
+      for (const [itm, name] of Object.entries(def.items)) {
+        const cur = thresholds[cat] && thresholds[cat][itm] !== undefined ? thresholds[cat][itm] : '';
+        html += `
+          <div class="row">
+            <div class="row-label">${esc(name)}</div>
+            <input type="number" min="0" step="1" value="${cur}" placeholder="—"
+                   data-kind="threshold" data-cat="${esc(cat)}" data-itm="${esc(itm)}">
+          </div>`;
       }
-      html += '</div>';
-      sections.push(html);
     }
+    html += '</div>';
+    sections.push(html);
 
     // Group alerts
     if ((config.groups || []).length) {
@@ -166,12 +190,15 @@
   async function save() {
     if (!config) return;
     const next = JSON.parse(JSON.stringify(config));
+    next.thresholds = {};
 
     document.querySelectorAll('input[data-kind="threshold"]').forEach(inp => {
+      if (inp.value === '' || inp.value === null) return; // blank = no alert
       const v = parseInt(inp.value);
       if (!Number.isFinite(v) || v < 0) return;
       const cat = inp.dataset.cat, itm = inp.dataset.itm;
-      if (next.thresholds[cat]) next.thresholds[cat][itm] = v;
+      if (!next.thresholds[cat]) next.thresholds[cat] = {};
+      next.thresholds[cat][itm] = v;
     });
 
     document.querySelectorAll('input[data-kind="group"]').forEach(inp => {
