@@ -969,7 +969,10 @@ function buildEmailTransport() {
   const pass = process.env.EMAIL_PASS;
   if (!user || !pass) return null;
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    requireTLS: true,
     auth: { user, pass },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
