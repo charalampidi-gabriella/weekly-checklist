@@ -53,34 +53,77 @@ function getScheduleDates(startDate, intervalDays) {
   };
 }
 
-// Alert thresholds: item is "low" when its combined-facility total is AT or BELOW this number
-const ALERT_THRESHOLDS = {
-  reels: {
-    hawk_touch: 3, hawk_tour_rpet: 3, hawk_power: 3,
-    lynx_tour: 3, lynx_touch: 3,
-    rpm_blast_16g: 3, rpm_blast_17g: 3, rpm_rough: 3, rpm_power: 3,
-    ice_code: 2, razor_soft: 2,
+// Alert thresholds. Loaded from the `app_config` table (key = 'alert_thresholds')
+// and cached in memory; reloaded after every successful POST /api/config/alerts.
+//
+// Shape: { thresholds: { category: { item: number } },
+//          groups: [ { id, category, label, multipliers: { item: factor }, threshold } ] }
+//
+// Group alerts fire when Σ(item_total × multiplier) is AT or BELOW threshold.
+// Multipliers > 1 are how we combine packets with loose units (e.g. prime_tour_grips
+// white_packets × 3 + white × 1, dampeners packets × 2 + singles × 1).
+const DEFAULT_ALERT_CONFIG = {
+  thresholds: {
+    reels: {
+      hawk_touch: 3, hawk_tour_rpet: 3, hawk_power: 3,
+      lynx_tour: 3, lynx_touch: 3,
+      rpm_blast_16g: 3, rpm_blast_17g: 3, rpm_rough: 3, rpm_power: 3,
+      ice_code: 2, razor_soft: 2,
+    },
+    gut_strings: {
+      synthetic_gut_head: 2, touch_vs: 1,
+    },
+    multifilament: {
+      x_one_biphase: 2, velocity_mlt: 2, reflex_mlt: 2,
+    },
+    pro_grips: { total: 20 },
   },
-  gut_strings: {
-    synthetic_gut_head: 2, touch_vs: 1,
-  },
-  multifilament: {
-    x_one_biphase: 2, velocity_mlt: 2, reflex_mlt: 2,
-  },
-  prime_tour_grips: { white: 15, black: 15, pink: 15, blue: 15 },
-  pro_grips: { total: 20 },
+  groups: [
+    {
+      id: 'polytour_pro_all',
+      category: 'reels',
+      label: 'Polytour Pro (all colors)',
+      multipliers: {
+        polytour_pro_yellow: 1, polytour_pro_blue: 1, polytour_pro_teal: 1,
+        polytour_pro_purple: 1, polytour_pro_black: 1,
+      },
+      threshold: 1,
+    },
+    { id: 'ptg_white', category: 'prime_tour_grips', label: 'Prime Tour White (combined grips)',
+      multipliers: { white_packets: 3, white: 1 }, threshold: 15 },
+    { id: 'ptg_black', category: 'prime_tour_grips', label: 'Prime Tour Black (combined grips)',
+      multipliers: { black_packets: 3, black: 1 }, threshold: 15 },
+    { id: 'ptg_pink',  category: 'prime_tour_grips', label: 'Prime Tour Pink (combined grips)',
+      multipliers: { pink_packets: 3, pink: 1 }, threshold: 15 },
+    { id: 'ptg_blue',  category: 'prime_tour_grips', label: 'Prime Tour Blue (combined grips)',
+      multipliers: { blue_packets: 3, blue: 1 }, threshold: 15 },
+    { id: 'dampeners_all', category: 'dampeners', label: 'Dampeners (combined)',
+      multipliers: { packets: 2, singles: 1 }, threshold: 10 },
+  ],
 };
 
-// Group alerts: fire when the SUM of these items' combined-facility totals is AT or BELOW threshold.
-// Use this when colors/variants of the same product should be tracked as one stock pool for restocking.
-const GROUP_ALERT_THRESHOLDS = [
-  {
-    category: 'reels',
-    label: 'Polytour Pro (all colors)',
-    items: ['polytour_pro_yellow', 'polytour_pro_blue', 'polytour_pro_teal', 'polytour_pro_purple', 'polytour_pro_black'],
-    threshold: 1,  // alert when combined total < 2 (i.e. ≤ 1)
-  },
-];
+let ALERT_CONFIG = DEFAULT_ALERT_CONFIG;
+
+async function loadAlertConfig() {
+  try {
+    const r = await db.execute({
+      sql: `SELECT value FROM app_config WHERE key = ?`,
+      args: ['alert_thresholds'],
+    });
+    if (r.rows.length === 0) {
+      await db.execute({
+        sql: `INSERT INTO app_config (key, value) VALUES (?, ?)`,
+        args: ['alert_thresholds', JSON.stringify(DEFAULT_ALERT_CONFIG)],
+      });
+      ALERT_CONFIG = DEFAULT_ALERT_CONFIG;
+    } else {
+      ALERT_CONFIG = JSON.parse(r.rows[0].value);
+    }
+  } catch (e) {
+    console.error('loadAlertConfig:', e);
+    ALERT_CONFIG = DEFAULT_ALERT_CONFIG;
+  }
+}
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 async function initDB() {
@@ -133,6 +176,13 @@ async function initDB() {
   // Legacy rows (type IS NULL) are treated as sales — that matches old behavior
   // where a "pull" directly decremented the single total count
   try { await db.execute(`UPDATE inventory_pulls SET type = 'sale' WHERE type IS NULL`); } catch (e) {}
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS app_config (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+  await loadAlertConfig();
 }
 
 app.use(express.json());
@@ -452,7 +502,7 @@ app.get('/api/inventory', async (req, res) => {
       if (hasData) {
         // Alerts fire on combined totals (storage + display) across all facilities
         const combinedAlerts = [];
-        for (const [cat, thresholds] of Object.entries(ALERT_THRESHOLDS)) {
+        for (const [cat, thresholds] of Object.entries(ALERT_CONFIG.thresholds || {})) {
           if (!totalEst[cat]) continue;
           for (const [itm, threshold] of Object.entries(thresholds)) {
             const cur = totalEst[cat][itm];
@@ -460,16 +510,22 @@ app.get('/api/inventory', async (req, res) => {
               combinedAlerts.push({ category: cat, item: itm, threshold, current: cur.total });
           }
         }
-        // Group alerts: sum items across the group, threshold against the sum
-        for (const g of GROUP_ALERT_THRESHOLDS) {
+        // Group alerts: sum items across the group with per-item multipliers
+        for (const g of (ALERT_CONFIG.groups || [])) {
           if (!totalEst[g.category]) continue;
+          const mults = g.multipliers || {};
           let sum = 0;
-          for (const itm of g.items) {
+          for (const [itm, factor] of Object.entries(mults)) {
             const cur = totalEst[g.category][itm];
-            if (cur !== undefined) sum += cur.total;
+            if (cur !== undefined) sum += cur.total * factor;
           }
-          if (sum <= g.threshold)
-            combinedAlerts.push({ category: g.category, item: g.label, group: true, items: g.items, threshold: g.threshold, current: sum });
+          if (sum <= g.threshold) {
+            combinedAlerts.push({
+              id: g.id, category: g.category, item: g.label, group: true,
+              items: Object.keys(mults), multipliers: mults,
+              threshold: g.threshold, current: sum,
+            });
+          }
         }
         combined[type] = { estimated: totalEst, alerts: combinedAlerts };
       }
@@ -554,6 +610,68 @@ app.get('/api/counts', async (req, res) => {
     res.json(rows.rows);
   } catch (err) {
     console.error('GET /api/counts:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── GET /api/config/alerts ─────────────────────────────────────────────────────
+app.get('/api/config/alerts', (req, res) => {
+  res.json(ALERT_CONFIG);
+});
+
+// ── POST /api/config/alerts ────────────────────────────────────────────────────
+// Accepts the full config object. Validates shape, then persists + reloads cache.
+app.post('/api/config/alerts', rateLimit, async (req, res) => {
+  try {
+    const cfg = req.body;
+    if (!cfg || typeof cfg !== 'object')
+      return res.status(400).json({ error: 'Body must be an object' });
+
+    const cleanThresholds = {};
+    if (cfg.thresholds && typeof cfg.thresholds === 'object') {
+      for (const [cat, items] of Object.entries(cfg.thresholds)) {
+        if (!items || typeof items !== 'object') continue;
+        const cleanCat = String(cat).slice(0, 50);
+        cleanThresholds[cleanCat] = {};
+        for (const [itm, val] of Object.entries(items)) {
+          const n = Number(val);
+          if (Number.isFinite(n) && n >= 0)
+            cleanThresholds[cleanCat][String(itm).slice(0, 100)] = n;
+        }
+      }
+    }
+
+    const cleanGroups = [];
+    if (Array.isArray(cfg.groups)) {
+      for (const g of cfg.groups) {
+        if (!g || typeof g !== 'object') continue;
+        const id = String(g.id || '').slice(0, 80);
+        const category = String(g.category || '').slice(0, 50);
+        const label = String(g.label || '').slice(0, 200);
+        const threshold = Number(g.threshold);
+        if (!id || !category || !label || !Number.isFinite(threshold) || threshold < 0) continue;
+        const mults = {};
+        if (g.multipliers && typeof g.multipliers === 'object') {
+          for (const [itm, f] of Object.entries(g.multipliers)) {
+            const n = Number(f);
+            if (Number.isFinite(n) && n > 0) mults[String(itm).slice(0, 100)] = n;
+          }
+        }
+        if (Object.keys(mults).length === 0) continue;
+        cleanGroups.push({ id, category, label, multipliers: mults, threshold });
+      }
+    }
+
+    const next = { thresholds: cleanThresholds, groups: cleanGroups };
+    await db.execute({
+      sql: `INSERT INTO app_config (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      args: ['alert_thresholds', JSON.stringify(next)],
+    });
+    ALERT_CONFIG = next;
+    res.json({ ok: true, config: next });
+  } catch (err) {
+    console.error('POST /api/config/alerts:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
