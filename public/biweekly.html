@@ -293,7 +293,7 @@
 <script>
   // Categories that accept 0.5 increments in counts (strings). Others are integer-only
   // unless the (category,item) is in DECIMAL_ITEMS.
-  const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament']);
+  const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament', 'ball_cases']);
   const DECIMAL_ITEMS = new Set(['supplies.hand_soap']);
   const allowsDecimal = (cat, item) => DECIMAL_CATEGORIES.has(cat) || DECIMAL_ITEMS.has(`${cat}.${item}`);
 

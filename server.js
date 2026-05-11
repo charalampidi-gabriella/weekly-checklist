@@ -13,7 +13,7 @@ const VALID_FACILITIES = ['SATC', 'Pharr', 'Wilco'];
 
 // Categories whose counts accept 0.5 increments (e.g. half-reel).
 // All other categories are integer-only unless the (category,item) is in DECIMAL_ITEMS.
-const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament']);
+const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament', 'ball_cases']);
 const DECIMAL_ITEMS = new Set(['supplies.hand_soap']);
 const allowsDecimal = (cat, item) => DECIMAL_CATEGORIES.has(cat) || DECIMAL_ITEMS.has(`${cat}.${item}`);
 const snapHalf = n => Math.round(n * 2) / 2;
@@ -285,13 +285,15 @@ app.post('/api/pull', rateLimit, async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     if (pulled_by.length > 100)
       return res.status(400).json({ error: 'Name too long' });
-    const qty = parseInt(quantity);
-    if (!qty || qty < 1 || qty > 10000)
-      return res.status(400).json({ error: 'Invalid quantity' });
     if (!category || typeof category !== 'string' || category.length > 50)
       return res.status(400).json({ error: 'Invalid category' });
     if (!item || typeof item !== 'string' || item.length > 100)
       return res.status(400).json({ error: 'Invalid item' });
+    const allowDec = allowsDecimal(category, item);
+    const qtyRaw = allowDec ? parseFloat(quantity) : parseInt(quantity);
+    const qty = allowDec ? Math.round(qtyRaw * 2) / 2 : qtyRaw;
+    if (!qty || qty <= 0 || qty > 10000 || (!allowDec && qty < 1))
+      return res.status(400).json({ error: 'Invalid quantity' });
     const eventType = type || 'sale';
     if (!['pull', 'sale', 'receipt'].includes(eventType))
       return res.status(400).json({ error: 'Invalid type' });
@@ -576,13 +578,15 @@ app.post('/api/transfer', rateLimit, async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     if (transferred_by.length > 100)
       return res.status(400).json({ error: 'Name too long' });
-    const qty = parseInt(quantity);
-    if (!qty || qty < 1 || qty > 10000)
-      return res.status(400).json({ error: 'Invalid quantity' });
     if (!category || typeof category !== 'string' || category.length > 50)
       return res.status(400).json({ error: 'Invalid category' });
     if (!item || typeof item !== 'string' || item.length > 100)
       return res.status(400).json({ error: 'Invalid item' });
+    const allowDec = allowsDecimal(category, item);
+    const qtyRaw = allowDec ? parseFloat(quantity) : parseInt(quantity);
+    const qty = allowDec ? Math.round(qtyRaw * 2) / 2 : qtyRaw;
+    if (!qty || qty <= 0 || qty > 10000 || (!allowDec && qty < 1))
+      return res.status(400).json({ error: 'Invalid quantity' });
 
     const cleanNotes = notes ? String(notes).trim().slice(0, 500) : null;
 

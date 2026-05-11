@@ -328,7 +328,7 @@
     <h2>Quantity</h2>
     <div class="qty-row">
       <button type="button" class="qty-btn" id="qty-dec">−</button>
-      <input class="qty-display" type="number" id="quantity" value="1" min="1">
+      <input class="qty-display" type="number" id="quantity" value="1" min="1" step="1">
       <button type="button" class="qty-btn" id="qty-inc">+</button>
     </div>
     <div class="error-msg" id="err-qty">Quantity must be at least 1.</div>
@@ -429,6 +429,23 @@
   const MODE_LABELS = { pull: 'Log Pull', receipt: 'Log Receipt', transfer: 'Log Transfer' };
   const MODE_BUSY   = { pull: 'Logging...', receipt: 'Logging...', transfer: 'Transferring...' };
 
+  const DECIMAL_CATEGORIES = new Set(['reels', 'gut_strings', 'multifilament', 'ball_cases']);
+  const DECIMAL_ITEMS = new Set(['supplies.hand_soap']);
+  const allowsDecimal = (cat, item) => DECIMAL_CATEGORIES.has(cat) || DECIMAL_ITEMS.has(`${cat}.${item}`);
+  function qtyAllowsDecimal() {
+    const cat = document.getElementById('category-select').value;
+    const item = document.getElementById('item-select').value;
+    return allowsDecimal(cat, item);
+  }
+  function applyQtyStep() {
+    const inp = document.getElementById('quantity');
+    const dec = qtyAllowsDecimal();
+    inp.step = dec ? '0.5' : '1';
+    inp.min  = dec ? '0.5' : '1';
+    const err = document.getElementById('err-qty');
+    if (err) err.textContent = dec ? 'Quantity must be at least 0.5.' : 'Quantity must be at least 1.';
+  }
+
   let mode = 'pull';
   let singleFacility = null;
   let fromFacility = null;
@@ -514,19 +531,27 @@
         (ITEMS_BY_CATEGORY[cat] || []).map(i => `<option value="${i.key}">${i.label}</option>`).join('');
     }
     hide('err-item');
+    applyQtyStep();
     updateSummary();
   }
-  document.getElementById('item-select').addEventListener('change', () => { hide('err-item'); updateSummary(); });
+  document.getElementById('item-select').addEventListener('change', () => { hide('err-item'); applyQtyStep(); updateSummary(); });
 
   // ── Quantity ─────────────────────────────────────────────────────────────────
   document.getElementById('qty-dec').addEventListener('click', () => {
     const inp = document.getElementById('quantity');
-    inp.value = Math.max(1, (parseInt(inp.value) || 1) - 1);
+    const dec = qtyAllowsDecimal();
+    const step = dec ? 0.5 : 1;
+    const min  = dec ? 0.5 : 1;
+    const cur  = parseFloat(inp.value) || min;
+    inp.value = Math.max(min, Math.round((cur - step) * 2) / 2);
     updateSummary();
   });
   document.getElementById('qty-inc').addEventListener('click', () => {
     const inp = document.getElementById('quantity');
-    inp.value = (parseInt(inp.value) || 0) + 1;
+    const dec = qtyAllowsDecimal();
+    const step = dec ? 0.5 : 1;
+    const cur  = parseFloat(inp.value) || 0;
+    inp.value = Math.round((cur + step) * 2) / 2;
     updateSummary();
   });
   document.getElementById('quantity').addEventListener('input', updateSummary);
@@ -534,7 +559,8 @@
   // ── Summary preview ──────────────────────────────────────────────────────────
   function updateSummary() {
     const itemSel = document.getElementById('item-select');
-    const qty     = parseInt(document.getElementById('quantity').value) || 0;
+    const qtyRaw  = parseFloat(document.getElementById('quantity').value) || 0;
+    const qty     = qtyAllowsDecimal() ? qtyRaw : Math.floor(qtyRaw);
     const box     = document.getElementById('summary-box');
     const itemLbl = itemSel.value ? (itemSel.options[itemSel.selectedIndex]?.text || itemSel.value) : null;
 
@@ -570,8 +596,11 @@
     const item = document.getElementById('item-select').value;
     if (!cat || !item) { show('err-item'); valid = false; }
 
-    const qty = parseInt(document.getElementById('quantity').value);
-    if (!qty || qty < 1) { show('err-qty'); valid = false; }
+    const dec = qtyAllowsDecimal();
+    const qtyRaw = parseFloat(document.getElementById('quantity').value);
+    const qty = dec ? Math.round(qtyRaw * 2) / 2 : Math.floor(qtyRaw);
+    const qtyMin = dec ? 0.5 : 1;
+    if (!qty || qty < qtyMin) { show('err-qty'); valid = false; }
 
     const name = document.getElementById('submitted_by').value.trim();
     if (!name) { show('err-name'); valid = false; }
